@@ -99,7 +99,7 @@ export function generateStudentReportPdf(student: StudentProfile): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139); // slate-500
-  doc.text(`Grade / Level: ${student.gradeLevel}  |  Email: ${student.email}`, margin + 5, y + 16);
+  doc.text(`Grade / Level: ${student.gradeLevel}`, margin + 5, y + 16);
   doc.text(`Primary Focus Area: ${student.preferredSubject}`, margin + 5, y + 22);
 
   // Status Badge

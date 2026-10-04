@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import nodemailer from 'nodemailer';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -112,7 +111,6 @@ interface Achievement {
 interface StudentProfile {
   id: string;
   name: string;
-  email: string;
   gradeLevel: string;
   preferredSubject: string;
   streakDays: number;
@@ -253,7 +251,6 @@ const mockStudents: Record<string, StudentProfile> = {
   'student-1': {
     id: 'student-1',
     name: 'Alex Chen',
-    email: 'alex.chen@university.edu',
     gradeLevel: 'Undergraduate (Year 2)',
     preferredSubject: 'Computer Science',
     streakDays: 6,
@@ -311,7 +308,6 @@ const mockStudents: Record<string, StudentProfile> = {
   'student-2': {
     id: 'student-2',
     name: 'Maya Patel',
-    email: 'maya.patel@school.org',
     gradeLevel: 'High School (AP Physics & Calc)',
     preferredSubject: 'Physics & STEM',
     streakDays: 12,

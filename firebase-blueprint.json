@@ -5,16 +5,15 @@
       "description": "Student user account and profile",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Firebase Auth UID" },
+        "id": { "type": "string", "description": "Student user ID" },
         "name": { "type": "string", "description": "Student full name", "maxLength": 100 },
-        "email": { "type": "string", "description": "Student email address" },
         "photoURL": { "type": "string", "description": "Student avatar URL" },
         "gradeLevel": { "type": "string", "description": "Academic grade level", "maxLength": 80 },
         "preferredSubject": { "type": "string", "description": "Primary study discipline", "maxLength": 80 },
         "streakDays": { "type": "number", "description": "Consecutive days study streak" },
         "xpPoints": { "type": "number", "description": "Total academic XP points earned" }
       },
-      "required": ["id", "name", "email"]
+      "required": ["id", "name"]
     },
     "quizRecord": {
       "title": "QuizRecord",

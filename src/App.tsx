@@ -13,14 +13,12 @@ import { CurriculumExplorer } from './components/CurriculumExplorer.tsx';
 import { LandingPage } from './components/LandingPage.tsx';
 import { AIAssistantWidget } from './components/AIAssistantWidget.tsx';
 import { StudentProfile } from './types.ts';
-import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 
-function AppInner() {
+export default function App() {
   const [activeTab, setActiveTab] = useState<string>('home');
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [allStudentIds, setAllStudentIds] = useState<string[]>(['student-1', 'student-2']);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const { user } = useAuth();
 
   // Cross-component navigation state
   const [quizPrefill, setQuizPrefill] = useState<{ subject: string; topic?: string }>({
@@ -32,17 +30,7 @@ function AppInner() {
       const res = await fetch('/api/student/profile');
       const data = await res.json();
       if (data.success && data.student) {
-        let baseStudent = data.student;
-        // If authenticated with Firebase, personalize with user identity
-        if (user) {
-          baseStudent = {
-            ...baseStudent,
-            id: user.uid,
-            name: user.displayName || baseStudent.name,
-            email: user.email || baseStudent.email,
-          };
-        }
-        setStudent(baseStudent);
+        setStudent(data.student);
         if (data.allStudentIds) {
           setAllStudentIds(data.allStudentIds);
         }
@@ -56,7 +44,7 @@ function AppInner() {
 
   useEffect(() => {
     fetchStudentProfile();
-  }, [user]);
+  }, []);
 
   const handleSwitchStudent = async (studentId: string) => {
     try {
@@ -199,17 +187,9 @@ function AppInner() {
               Intelligent Tutor AI Learning System
             </span>
           </div>
-          <div>&copy; 2024 Intelligent Tutor System. Firebase Auth & Firestore Enabled.</div>
+          <div>&copy; 2024 Intelligent Tutor System. Adaptive Learning Platform.</div>
         </div>
       </footer>
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <AuthProvider>
-      <AppInner />
-    </AuthProvider>
   );
 }

@@ -36,7 +36,6 @@ export interface Achievement {
 export interface StudentProfile {
   id: string;
   name: string;
-  email: string;
   gradeLevel: string;
   preferredSubject: string;
   streakDays: number;
@@ -45,8 +44,6 @@ export interface StudentProfile {
   weakAreas: WeakArea[];
   quizHistory: QuizRecord[];
   achievements?: Achievement[];
-  isAuthenticated?: boolean;
-  authMethod?: 'email_otp' | 'password' | 'guest';
 }
 
 export type TutorMode = 'socratic' | 'deep_dive' | 'eli5' | 'practice' | 'code_debug';

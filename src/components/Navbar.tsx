@@ -4,9 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { Menu, X, ChevronDown, Check, Trophy, Flame, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Menu, X, ChevronDown, Check, Trophy, Flame, User as UserIcon } from 'lucide-react';
 import { StudentProfile } from '../types.ts';
-import { useAuth } from '../context/AuthContext.tsx';
 
 interface NavbarProps {
   activeTab: string;
@@ -25,7 +24,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [studentMenuOpen, setStudentMenuOpen] = useState(false);
-  const { user, signIn, signOut, loading, authError } = useAuth();
 
   // All 6 tabs perfectly styled in collegiate light aesthetic
   const navTabs = [
@@ -134,38 +132,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           })}
         </nav>
 
-        {/* Right CTA Button & Firebase Auth Section */}
+        {/* Right CTA Button & Scholar Profile Section */}
         <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
-          {/* Sign In with Google Button (when unauthenticated) */}
-          {!user && (
-            <button
-              onClick={() => signIn()}
-              className="inline-flex items-center gap-2 bg-white hover:bg-[#F4F2EE] text-[#0D1B2A] text-xs font-serif font-bold px-3.5 py-2 rounded-lg border border-[#E2DED6] shadow-2xs transition-all cursor-pointer"
-              title="Sign in with your Google Account via Firebase Auth"
-            >
-              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.34 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span className="hidden sm:inline">Sign In with Google</span>
-              <span className="sm:hidden">Sign In</span>
-            </button>
-          )}
-
           <button
             onClick={() => setActiveTab('tutor')}
             className="hidden lg:inline-flex items-center justify-center bg-[#0D1B2A] hover:bg-[#1B2A4A] text-white text-xs font-bold uppercase tracking-wider px-4 sm:px-5 py-2.5 rounded-lg shadow-xs transition-all cursor-pointer border border-[#A17F3B]/40"
@@ -178,13 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={() => setStudentMenuOpen(!studentMenuOpen)}
               className="flex items-center gap-2 p-1 rounded-full hover:bg-[#F4F2EE] transition-colors focus:outline-hidden cursor-pointer"
-              title={
-                user
-                  ? `Authenticated as ${user.displayName || user.email}`
-                  : student
-                  ? `Active Profile: ${student.name}`
-                  : 'Scholar Profile'
-              }
+              title={student ? `Active Profile: ${student.name}` : 'Scholar Profile'}
             >
               {/* Daily Streak Status Badge on Profile */}
               {student && (
@@ -196,64 +158,33 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <div className="relative">
                 <img
-                  src={
-                    user?.photoURL ||
-                    'https://lh3.googleusercontent.com/aida/AEtjO1VQp42nJsqSdTyuAGeRbj0F79hidjZaji-woxvGewclpr4E44hcTUVgLzwWOCYb0K55zG0iQxwjZy7Cc8Psr70ePraStMxrV13I9VPL-__wtfgbwLyB3gK44yCjqZBj-GCP2vfYK55FJJSdALRxI9i1S2Jg1xeXbEoUdI7IT4A5slPQax1sPS2W973kI9Fte-mjA-1chy1C3G6WJvpLwcgRotJOhA03Qw2zPWYLFpwGrm9pF_3oUSjgBXhl'
-                  }
+                  src="https://lh3.googleusercontent.com/aida/AEtjO1VQp42nJsqSdTyuAGeRbj0F79hidjZaji-woxvGewclpr4E44hcTUVgLzwWOCYb0K55zG0iQxwjZy7Cc8Psr70ePraStMxrV13I9VPL-__wtfgbwLyB3gK44yCjqZBj-GCP2vfYK55FJJSdALRxI9i1S2Jg1xeXbEoUdI7IT4A5slPQax1sPS2W973kI9Fte-mjA-1chy1C3G6WJvpLwcgRotJOhA03Qw2zPWYLFpwGrm9pF_3oUSjgBXhl"
                   alt="Scholar Portrait"
                   className="w-10 h-10 rounded-full object-cover border-2 border-[#E9C176] shadow-2xs hover:border-[#A17F3B] transition-colors"
                 />
                 <span
-                  className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${
-                    user ? 'bg-emerald-500' : 'bg-amber-400'
-                  }`}
-                  title={user ? 'Firebase Auth Connected' : 'Guest Scholar Mode'}
+                  className="absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full bg-emerald-500"
+                  title="Active Academic Session"
                 />
               </div>
             </button>
 
-            {/* Profile Dropdown with Firebase Auth & Achievements Summary */}
+            {/* Profile Dropdown with Switcher & Achievements Summary */}
             {studentMenuOpen && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E2DED6] p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                {/* Auth status card */}
+                {/* Scholar Profile card */}
                 <div className="px-3.5 py-3 border-b border-[#E2DED6] mb-2.5 bg-[#FAF9F7] rounded-xl">
-                  {user ? (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-serif font-bold text-xs text-[#0D1B2A]">
-                          {user.displayName || 'Academic Scholar'}
-                        </span>
-                        <span className="font-mono text-[9px] uppercase px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold flex items-center gap-1">
-                          <Check className="w-2.5 h-2.5 text-emerald-700" />
-                          Authenticated
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#5A6065] truncate">{user.email}</p>
-                      <p className="text-[10px] text-[#A17F3B] font-mono mt-0.5">Firebase Auth &bull; Google Login</p>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-serif font-bold text-sm text-[#0D1B2A]">
+                        {student?.name || 'Active Scholar'}
+                      </span>
+                      <span className="font-mono text-[9px] uppercase px-2 py-0.5 rounded-full bg-brass-subtle border border-[#E9C176] text-[#0D1B2A] font-bold">
+                        {student?.preferredSubject || 'STEM'}
+                      </span>
                     </div>
-                  ) : (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-serif font-bold text-xs text-[#0D1B2A]">
-                          {student?.name || 'Active Scholar'}
-                        </span>
-                        <span className="font-mono text-[9px] uppercase px-2 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-800 font-bold">
-                          Guest Mode
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#5A6065] truncate">{student?.email}</p>
-                      <button
-                        onClick={() => {
-                          setStudentMenuOpen(false);
-                          signIn();
-                        }}
-                        className="mt-2.5 w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-white border border-[#E2DED6] hover:bg-[#F4F2EE] text-xs font-serif font-semibold text-[#0D1B2A] transition-colors"
-                      >
-                        <LogIn className="w-3.5 h-3.5 text-[#A17F3B]" />
-                        <span>Sign In with Google</span>
-                      </button>
-                    </div>
-                  )}
+                    <p className="text-[11px] text-[#5A6065]">{student?.gradeLevel}</p>
+                  </div>
 
                   {/* Student Streak & Achievements Visual Summary */}
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[#E5E1D8]">
@@ -270,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 {/* Switch Learner Profile Option */}
                 <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#5A6065]">
-                  Switch Demo Student:
+                  Switch Learner Profile:
                 </div>
 
                 {allStudentIds.map((id) => (
@@ -290,22 +221,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {student?.id === id && <Check className="w-3.5 h-3.5 text-[#A17F3B]" />}
                   </button>
                 ))}
-
-                {/* Sign Out Button (when authenticated) */}
-                {user && (
-                  <div className="pt-2 mt-2 border-t border-[#E5E1D8]">
-                    <button
-                      onClick={() => {
-                        signOut();
-                        setStudentMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-serif text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign Out from Firebase</span>
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -341,27 +256,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           ))}
           <div className="pt-3 border-t border-[#E5E1D8] space-y-2">
-            {!user ? (
-              <button
-                onClick={() => {
-                  signIn();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-white text-[#0D1B2A] text-xs font-bold py-2.5 rounded-xl border border-[#E2DED6]"
-              >
-                <span>Sign In with Google</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  signOut();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-rose-50 text-rose-700 text-xs font-bold py-2.5 rounded-xl border border-rose-200"
-              >
-                <span>Sign Out ({user.displayName || user.email})</span>
-              </button>
-            )}
             <button
               onClick={() => {
                 setActiveTab('tutor');
@@ -377,3 +271,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

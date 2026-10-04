@@ -22,10 +22,9 @@ service cloud.firestore {
 
     // User profile document validation
     function isValidUser(data) {
-      return data.keys().hasAll(['id', 'name', 'email']) &&
-        data.id is string && data.id == request.auth.uid &&
-        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-        data.email is string && data.email.size() > 0 && data.email.size() <= 200;
+      return data.keys().hasAll(['id', 'name']) &&
+        data.id is string && isValidId(data.id) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100;
     }
 
     // Quiz record validation
