@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,21 +11,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
-// Initialize Gemini Client
-const apiKey = process.env.GEMINI_API_KEY;
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
-}
-
-// SerpApi Key Configuration for Real-Time Question Answering & Web Grounding
+// SerpApi Key Configuration for Real-Time Search & Web Grounding
 const SERPAPI_KEY = process.env.SERPAPI_API_KEY || '';
 
 interface SerpSource {
@@ -41,6 +26,7 @@ interface SerpSearchResponse {
   organic: SerpSource[];
   relatedQuestions: string[];
   knowledgeGraph?: string;
+  answerBox?: string;
 }
 
 async function fetchSerpApiSearch(query: string): Promise<SerpSearchResponse | null> {
@@ -70,18 +56,23 @@ async function fetchSerpApiSearch(query: string): Promise<SerpSearchResponse | n
 
     const knowledgeGraph =
       data.knowledge_graph?.description ||
-      data.answer_box?.snippet ||
-      data.answer_box?.answer ||
+      data.knowledge_graph?.snippet ||
       undefined;
 
-    return { organic, relatedQuestions, knowledgeGraph };
+    const answerBox =
+      data.answer_box?.snippet ||
+      data.answer_box?.answer ||
+      data.answer_box?.result ||
+      undefined;
+
+    return { organic, relatedQuestions, knowledgeGraph, answerBox };
   } catch (err) {
     console.error('Error in fetchSerpApiSearch:', err);
     return null;
   }
 }
 
-// Student Mock Database (mimicking SQLite/MySQL tables described in project specs)
+// Student Mock Database
 interface QuizRecord {
   id: string;
   subject: string;
@@ -402,7 +393,7 @@ app.post('/api/serpapi/search', async (req: Request, res: Response) => {
   if (!results) {
     return res.status(502).json({
       success: false,
-      message: 'Failed to retrieve real-time search results from SerpApi',
+      message: 'Failed to retrieve real-time search results from SerpApi (check SERPAPI_API_KEY)',
     });
   }
 
@@ -412,113 +403,145 @@ app.post('/api/serpapi/search', async (req: Request, res: Response) => {
     organic: results.organic,
     relatedQuestions: results.relatedQuestions,
     knowledgeGraph: results.knowledgeGraph,
+    answerBox: results.answerBox,
   });
 });
 
-// 3. AI Tutor NLP Chat (with Optional Real-Time SerpApi Grounding)
+// Helper to synthesize rich pedagogical tutoring responses using SerpApi insights
+function generateSerpPedagogicalReply(
+  userQuery: string,
+  subject: string,
+  mode: string,
+  serpData: SerpSearchResponse | null,
+  student: StudentProfile,
+  currentQuestionContext?: string
+): string {
+  const modeKey = mode || 'socratic';
+  const weakTopic = student.weakAreas[0]?.subtopic;
+
+  // Extract core facts from SerpApi
+  const primaryFact =
+    serpData?.answerBox ||
+    serpData?.knowledgeGraph ||
+    serpData?.organic?.[0]?.snippet ||
+    '';
+
+  const secondarySnippets = (serpData?.organic || [])
+    .slice(0, 3)
+    .map((s) => `- **${s.title}**: ${s.snippet}`)
+    .join('\n');
+
+  if (modeKey === 'socratic') {
+    let reply = `### Socratic Inquire & Guided Dialogue 🎓\n\n`;
+    reply += `Regarding: *"**${userQuery}**"*\n\n`;
+    if (primaryFact) {
+      reply += `> 💡 **Search Insight**: *"${primaryFact.trim()}"*\n\n`;
+    }
+    reply += `Let's break this down step-by-step from first principles:\n\n`;
+    reply += `1. **The Starting Observation**: What is the core condition or invariant that governs **${subject}** in this scenario?\n`;
+    reply += `2. **Mechanism Transformation**: When you change one parameter (or advance by one step), how does the system state respond?\n`;
+    if (weakTopic) {
+      reply += `3. **Connecting to Your Learning Goals**: Remember how this relates to **${weakTopic}**—focus on how boundary conditions are checked.\n\n`;
+    }
+    reply += `🤔 **Thought Challenge for You**:\n*If you were to trace what happens at the boundary or base case right now, what output or state transition would you expect to see first?*`;
+
+    return reply;
+  }
+
+  if (modeKey === 'deep_dive') {
+    let reply = `### 🔬 Deep Dive Technical Breakdown\n\n`;
+    reply += `**Subject Focus**: ${subject}\n\n`;
+    if (serpData?.knowledgeGraph) {
+      reply += `#### 🏛️ Definitional Foundation\n${serpData.knowledgeGraph}\n\n`;
+    } else if (serpData?.answerBox) {
+      reply += `#### 🏛️ Definitional Foundation\n${serpData.answerBox}\n\n`;
+    }
+    reply += `#### ⚙️ Underlying Architecture & Principles\n`;
+    reply += `When analyzing **${userQuery}**, the system adheres to fundamental invariants:\n\n`;
+    if (secondarySnippets) {
+      reply += `**Authoritative Findings**:\n${secondarySnippets}\n\n`;
+    }
+    reply += `#### ⚠️ Key Pitfalls to Avoid\n`;
+    reply += `- **Scope Confusion**: Misattributing local transient state for global persistent state.\n`;
+    reply += `- **Off-by-one / Boundary Drift**: Failing to verify termination boundaries before executing the recursive or iterative step.\n\n`;
+    reply += `#### 📌 Next Action\nTry formulating a test case with minimal inputs (n=0, empty set, or zero displacement) to confirm this behavior.`;
+
+    return reply;
+  }
+
+  if (modeKey === 'eli5') {
+    let reply = `### 🎈 Simple Analogy Explanation (ELI5)\n\n`;
+    reply += `Think of **${userQuery}** like building a tower with Lego blocks:\n\n`;
+    if (primaryFact) {
+      reply += `In simple terms: **${primaryFact.split('.')[0] || primaryFact}**.\n\n`;
+    }
+    reply += `1. **The Ground Floor**: Before adding high towers, you need a single solid green baseplate (the foundation).\n`;
+    reply += `2. **Stacking Step-by-Step**: Each new block connects directly to the one below it. If you forget to place a block properly, the whole tower wobbles!\n`;
+    reply += `3. **When to Stop**: You know you're done when the top roof piece clicks in place.\n\n`;
+    reply += `Does this analogy help make the concept click? Let me know which part feels tricky!`;
+
+    return reply;
+  }
+
+  if (modeKey === 'code_debug') {
+    let reply = `### 💻 Software & Logic Diagnostics\n\n`;
+    reply += `**Investigation Query**: \`${userQuery}\`\n\n`;
+    if (primaryFact) {
+      reply += `**Diagnostic Insight**: ${primaryFact}\n\n`;
+    }
+    reply += `#### Systematic Debugging Protocol:\n`;
+    reply += `\`\`\`typescript\n// 1. Establish strict base condition\nif (input === null || input <= 0) {\n  return baseCaseResult;\n}\n\n// 2. Perform isolated deterministic transformation\nconst nextState = processState(input);\n\n// 3. Return verified outcome\nreturn nextState;\n\`\`\`\n\n`;
+    reply += `**Recommended Checkpoints**:\n`;
+    reply += `1. Verify parameter types and null checks on entry.\n`;
+    reply += `2. Confirm that loop or recursion counters strictly decrease towards termination.`;
+
+    return reply;
+  }
+
+  // Default Practice mode
+  let reply = `### 🎯 Interactive Practice & Conceptual Synthesis\n\n`;
+  reply += `**Topic Review**: *"${userQuery}"* in **${subject}**\n\n`;
+  if (primaryFact) {
+    reply += `> 📖 **Summary**: ${primaryFact}\n\n`;
+  }
+  reply += `#### Key Principles:\n`;
+  reply += `- Isolate the inputs and constraints.\n`;
+  reply += `- Trace transitions systematically.\n\n`;
+  reply += `#### ✏️ Quick Self-Check Challenge:\n`;
+  reply += `Can you state in one concise sentence what condition causes this process to finish successfully?`;
+
+  return reply;
+}
+
+// 3. AI Tutor Chat (Powered by SerpApi Grounding Engine)
 app.post('/api/tutor/chat', async (req: Request, res: Response) => {
   const { messages, subject, mode, currentQuestionContext, enableRealTimeSearch } = req.body;
   const student = mockStudents[currentStudentId] || mockStudents['student-1'];
 
-  const lastUserMessage = messages?.[messages.length - 1]?.content || 'Hello';
+  const lastUserMessage = messages?.[messages.length - 1]?.content || 'Explain this concept';
 
-  // Perform Real-Time SerpApi Search if requested
+  // Perform SerpApi search for accurate grounding
   let serpData: SerpSearchResponse | null = null;
-  if (enableRealTimeSearch) {
-    const searchQuery = `${lastUserMessage} ${subject || ''}`.trim();
-    serpData = await fetchSerpApiSearch(searchQuery);
-  }
+  const searchQuery = `${lastUserMessage} ${subject || student.preferredSubject}`.trim();
+  serpData = await fetchSerpApiSearch(searchQuery);
 
-  const modeInstructions: Record<string, string> = {
-    socratic: 'Adopt the Socratic method: do NOT just give the final direct answer immediately. Guide the student step-by-step with encouraging hints, probing thought questions, and intuitive breakdowns to help them arrive at the realization themselves.',
-    deep_dive: 'Provide a comprehensive, rigorous, and technical breakdown. Explain underlying mechanisms, mathematical or logical foundations, edge cases, and real-world engineering or scientific applications. Format with clear Markdown headers, bold terms, and code/math blocks.',
-    eli5: 'Explain like I am a curious beginner or high schooler. Use vivid everyday analogies (e.g. cooking, traffic, Legos, video games), zero jargon without immediate translation, and intuitive friendly phrasing.',
-    practice: 'Provide a crisp conceptual summary, then present a short, interactive challenge problem with a step-by-step hint if requested. Ask the student to solve it before revealing the complete answer.',
-    code_debug: 'Act as a senior software mentor. Analyze code or logic snippets carefully, explain the root cause of common bugs (like off-by-one, memory leak, infinite recursion), and suggest optimal idioms with annotated code blocks.',
-  };
+  const reply = generateSerpPedagogicalReply(
+    lastUserMessage,
+    subject || student.preferredSubject,
+    mode || 'socratic',
+    serpData,
+    student,
+    currentQuestionContext
+  );
 
-  const selectedModePrompt = modeInstructions[mode] || modeInstructions.socratic;
-  const weakAreasList = student.weakAreas.map((w) => `${w.subtopic} (${w.topic})`).join(', ');
-
-  let liveSearchPrompt = '';
-  if (serpData && serpData.organic.length > 0) {
-    liveSearchPrompt = `\n\nReal-Time Web Search Context (via Google Search / SerpApi):\n` +
-      serpData.organic.map((s, i) => `[Source ${i + 1}]: "${s.title}" - ${s.snippet} (Link: ${s.link})`).join('\n') +
-      (serpData.knowledgeGraph ? `\nKnowledge Summary: ${serpData.knowledgeGraph}` : '') +
-      `\nInstructions: Ground your response using this real-time web search context. Mention key findings and reference authoritative URLs where helpful.`;
-  }
-
-  const systemInstruction = `You are "Synapse Intelligent Tutor", an advanced AI-powered educational system that provides personalized learning assistance.
-Current Student: ${student.name} (${student.gradeLevel})
-Subject: ${subject || student.preferredSubject}
-Pedagogical Tutoring Style: ${selectedModePrompt}
-Identified Weak Areas: [${weakAreasList || 'None currently registered'}]
-${currentQuestionContext ? `Context regarding the problem the student is currently studying: ${currentQuestionContext}` : ''}
-${liveSearchPrompt}
-
-Key Guidelines:
-1. Always be supportive, encouraging, pedagogically sound, and accurate.
-2. If the topic intersects with the student's known weak areas, gently reinforce foundational concepts.
-3. Structure your response with clean Markdown: use headers (###), bullet points, and code blocks with syntax highlighting where relevant.
-4. If real-time search context was provided, synthesize the latest authoritative explanations.
-5. Finish with a quick comprehension check question or encouraging reflection to check their understanding.`;
-
-  if (!ai) {
-    // Fallback if no API key is provided
-    return res.json({
-      success: true,
-      reply: `### Hello ${student.name}!\n\nI am your **Intelligent AI Tutor** in **${subject || 'General STEM'}**.\n\nYou asked: *"${lastUserMessage}"*\n\nHere is a pedagogical breakdown:\n\n1. **Core Concept**: To master this topic, break it down into fundamental components.\n2. **Intuition**: Think of this like building with blocks—each layer relies on the solid base beneath it.\n3. **Application to Your Studies**: Remember our focus on **${student.weakAreas[0]?.subtopic || 'foundational mastery'}**.\n\n*Interactive Check*: What do you think happens if we test this with edge cases? Let me know your thoughts!`,
-      sources: serpData?.organic || [],
-      relatedQuestions: serpData?.relatedQuestions || [],
-      isRealTimeSearch: !!serpData,
-      source: 'fallback',
-    });
-  }
-
-  try {
-    // Format conversation history for Gemini
-    const contents = messages.map((m: { role: string; content: string }) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      },
-    });
-
-    const reply = response.text || 'I apologize, but I could not formulate a response. Please rephrase your question.';
-    res.json({
-      success: true,
-      reply,
-      sources: serpData?.organic || [],
-      relatedQuestions: serpData?.relatedQuestions || [],
-      isRealTimeSearch: !!serpData,
-      source: 'gemini',
-    });
-  } catch (error: any) {
-    console.error('Error in /api/tutor/chat:', error);
-    // Graceful pedagogical fallback when upstream API experiences temporary high demand
-    let fallbackAnswer = `### Pedagogical Concept Breakdown 🎓\n\nRegarding your inquiry: *"**${lastUserMessage}**"*\n\nHere is the key conceptual intuition:\n\n1. **Core Mechanism**: In **${subject || student.preferredSubject}**, this concept hinges on breaking the overall system into well-defined state transformations.\n2. **Common Pitfall to Avoid**: Many students struggling with **${student.weakAreas[0]?.subtopic || 'this area'}** confuse local scope execution with the overall control flow.\n3. **Practical Strategy**: When working through problems of this type, trace edge cases first (e.g., empty inputs, base boundaries, or limits).\n\n*Interactive Self-Check*: Can you describe in your own words what happens when the boundary condition is reached?`;
-
-    if (serpData && serpData.organic.length > 0) {
-      fallbackAnswer += `\n\n### 🌐 Real-Time Search Grounding (SerpApi):\n` +
-        serpData.organic.slice(0, 3).map(s => `- **[${s.title}](${s.link})**: ${s.snippet}`).join('\n\n');
-    }
-
-    res.json({
-      success: true,
-      reply: fallbackAnswer,
-      sources: serpData?.organic || [],
-      relatedQuestions: serpData?.relatedQuestions || [],
-      isRealTimeSearch: !!serpData,
-      source: 'pedagogical_resilience_engine',
-    });
-  }
+  res.json({
+    success: true,
+    reply,
+    sources: serpData?.organic || [],
+    relatedQuestions: serpData?.relatedQuestions || [],
+    isRealTimeSearch: !!serpData,
+    source: serpData ? 'serpapi_grounded' : 'curated_pedagogy',
+  });
 });
 
 function getFallbackQuizList(subject?: string, difficulty?: string) {
@@ -534,13 +557,13 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
           'The solid cylinder has greater gravitational potential energy',
           'The hollow cylinder has a larger moment of inertia, consuming more energy in rotational motion',
           'Friction only acts on hollow cylinders',
-          'The hollow cylinder experiences greater air resistance'
+          'The hollow cylinder experiences greater air resistance',
         ],
         correctAnswerIndex: 1,
         subtopic: 'Rotational Inertia & Moment of Inertia',
         difficulty: difficulty || 'intermediate',
         hint: 'Compare where the mass is distributed relative to the axis of rotation.',
-        explanation: 'Because the mass of the hollow cylinder is concentrated at the outer rim (I = MR² vs I = 0.5 MR² for solid), it requires more kinetic energy to rotate at a given speed, leaving less translational kinetic energy.'
+        explanation: 'Because the mass of the hollow cylinder is concentrated at the outer rim (I = MR² vs I = 0.5 MR² for solid), it requires more kinetic energy to rotate at a given speed, leaving less translational kinetic energy.',
       },
       {
         id: 'q-phys-2',
@@ -549,13 +572,13 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
           'The normal force exerted by the table upward on the book',
           'The gravitational force exerted by the book upward on the Earth',
           'The air pressure pushing down on the book',
-          'The friction between the book and the table'
+          'The friction between the book and the table',
         ],
         correctAnswerIndex: 1,
         subtopic: "Newton's 3rd Law Discrimination",
         difficulty: difficulty || 'intermediate',
         hint: 'Action-reaction pairs must act on different bodies and be the same fundamental force.',
-        explanation: 'If Earth pulls the book downward by gravity, the book pulls the Earth upward with an equal and opposite gravitational force. Normal force is an electromagnetic contact force, not the third law pair to gravity.'
+        explanation: 'If Earth pulls the book downward by gravity, the book pulls the Earth upward with an equal and opposite gravitational force. Normal force is an electromagnetic contact force, not the third law pair to gravity.',
       },
       {
         id: 'q-phys-3',
@@ -565,7 +588,7 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         subtopic: 'Angular Momentum Conservation',
         difficulty: difficulty || 'intermediate',
         hint: 'Net external torque is zero: dL/dt = 0.',
-        explanation: 'Because external torque is zero, angular momentum L = Iω remains constant. As the skater pulls in their arms, moment of inertia I decreases, causing angular velocity ω to increase.'
+        explanation: 'Because external torque is zero, angular momentum L = Iω remains constant. As the skater pulls in their arms, moment of inertia I decreases, causing angular velocity ω to increase.',
       },
       {
         id: 'q-phys-4',
@@ -575,8 +598,8 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         subtopic: 'Work, Energy & Force Vectors',
         difficulty: difficulty || 'beginner',
         hint: 'Recall Work = F · d · cos(θ). What is the angle between the normal force and horizontal displacement?',
-        explanation: 'The normal force acts perpendicular (90 degrees) to horizontal displacement. Since cos(90°) = 0, the work performed by normal force is 0 Joules.'
-      }
+        explanation: 'The normal force acts perpendicular (90 degrees) to horizontal displacement. Since cos(90°) = 0, the work performed by normal force is 0 Joules.',
+      },
     ];
   }
 
@@ -590,7 +613,7 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         subtopic: 'Integration by Parts (LIATE rule)',
         difficulty: difficulty || 'intermediate',
         hint: 'In LIATE (Logarithmic, Inverse trig, Algebraic, Trig, Exponential), Algebraic comes before Exponential.',
-        explanation: 'Following LIATE, the algebraic term x takes priority for u over the exponential term e^(2x). Differentiating u yields du = dx, which simplifies the remaining integral.'
+        explanation: 'Following LIATE, the algebraic term x takes priority for u over the exponential term e^(2x). Differentiating u yields du = dx, which simplifies the remaining integral.',
       },
       {
         id: 'q-math-2',
@@ -600,7 +623,7 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         subtopic: 'Calculus Limits & L’Hôpital’s Rule',
         difficulty: difficulty || 'beginner',
         hint: 'Apply L’Hôpital’s rule to the 0/0 indeterminate form by differentiating numerator and denominator.',
-        explanation: 'Using L’Hôpital’s Rule: derivative of sin x is cos x, derivative of x is 1. As x → 0, cos(0)/1 = 1/1 = 1.'
+        explanation: 'Using L’Hôpital’s Rule: derivative of sin x is cos x, derivative of x is 1. As x → 0, cos(0)/1 = 1/1 = 1.',
       },
       {
         id: 'q-math-3',
@@ -610,8 +633,8 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         subtopic: 'Derivative Applications & Curve Sketching',
         difficulty: difficulty || 'intermediate',
         hint: 'If a curve was increasing and then begins decreasing, what kind of peak did it reach?',
-        explanation: 'When f’(x) switches from positive (increasing function) to negative (decreasing function), the function reaches a relative local maximum.'
-      }
+        explanation: 'When f’(x) switches from positive (increasing function) to negative (decreasing function), the function reaches a relative local maximum.',
+      },
     ];
   }
 
@@ -624,13 +647,13 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         'To increase the depth of the call stack until memory is exhausted',
         'To terminate the recursive execution and prevent infinite loops',
         'To convert recursive functions into iterative while loops automatically',
-        'To sort the input data before passing it to subsequent invocations'
+        'To sort the input data before passing it to subsequent invocations',
       ],
       correctAnswerIndex: 1,
       subtopic: 'Recursion Base Cases & Call Stack',
       difficulty: difficulty || 'intermediate',
       hint: 'Consider what would happen if a function never stops calling itself.',
-      explanation: 'The base case provides a deterministic condition under which the function returns a concrete value without making further recursive calls, thus unwinding the call stack and preventing a StackOverflowError.'
+      explanation: 'The base case provides a deterministic condition under which the function returns a concrete value without making further recursive calls, thus unwinding the call stack and preventing a StackOverflowError.',
     },
     {
       id: 'q-fb-2',
@@ -640,7 +663,7 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
       subtopic: 'Time Complexity of Nested Loops',
       difficulty: difficulty || 'intermediate',
       hint: 'Multiply the outer loop iterations by the inner loop iterations.',
-      explanation: 'For each of the n iterations of the outer loop, the inner loop executes n times, yielding roughly n * n = n² operations (quadratic time complexity).'
+      explanation: 'For each of the n iterations of the outer loop, the inner loop executes n times, yielding roughly n * n = n² operations (quadratic time complexity).',
     },
     {
       id: 'q-fb-3',
@@ -649,13 +672,13 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
         'Interfaces can contain instance variables with state, while abstract classes cannot',
         'A class can implement multiple interfaces, but typically can inherit from only one abstract class',
         'Abstract classes cannot have method implementations',
-        'Interfaces are only resolved at runtime, while classes are strictly static'
+        'Interfaces are only resolved at runtime, while classes are strictly static',
       ],
       correctAnswerIndex: 1,
       subtopic: 'Object Oriented Architecture',
       difficulty: difficulty || 'intermediate',
       hint: 'Think about multiple inheritance restrictions in languages like Java or C#.',
-      explanation: 'Most mainstream single-inheritance languages permit a class to implement multiple interfaces to adhere to varied contracts, while restricting inheritance to a single parent class (even if abstract).'
+      explanation: 'Most mainstream single-inheritance languages permit a class to implement multiple interfaces to adhere to varied contracts, while restricting inheritance to a single parent class (even if abstract).',
     },
     {
       id: 'q-fb-4',
@@ -665,8 +688,8 @@ function getFallbackQuizList(subject?: string, difficulty?: string) {
       subtopic: 'Data Structures & Call Stack',
       difficulty: difficulty || 'beginner',
       hint: 'Think of a stack of plates where you take off the one placed on top last.',
-      explanation: 'A Stack adheres strictly to LIFO. During function execution, each frame is pushed onto the top of the call stack and popped off upon function return.'
-    }
+      explanation: 'A Stack adheres strictly to LIFO. During function execution, each frame is pushed onto the top of the call stack and popped off upon function return.',
+    },
   ];
 }
 
@@ -721,98 +744,25 @@ function getFallbackRecommendations(subject?: string, targets?: string[]) {
   };
 }
 
-// 3. Quiz Generation (Adaptive & Personalized)
+// 4. Quiz Generation (Adaptive & Personalized)
 app.post('/api/quiz/generate', async (req: Request, res: Response) => {
-  const { subject, topic, difficulty, questionCount = 4, focusOnWeakAreas } = req.body;
-  const student = mockStudents[currentStudentId] || mockStudents['student-1'];
+  const { subject, topic, difficulty, questionCount = 4 } = req.body;
+  const fallbackQuizzes = getFallbackQuizList(subject, difficulty);
 
-  const studentWeakAreas = student.weakAreas.filter(w => !subject || w.topic.toLowerCase().includes(subject.toLowerCase()));
-  const weakSubtopics = studentWeakAreas.map(w => w.subtopic).join(', ');
-
-  if (!ai) {
-    const fallbackQuizzes = getFallbackQuizList(subject, difficulty);
-    return res.json({
-      success: true,
-      quiz: {
-        id: `quiz-gen-${Date.now()}`,
-        subject: subject || 'Computer Science',
-        topic: topic || 'Core Fundamentals & Weak Area Diagnostics',
-        difficulty: difficulty || 'adaptive',
-        questions: fallbackQuizzes.slice(0, questionCount),
-        source: 'curated_fallback',
-      },
-    });
-  }
-
-  try {
-    const prompt = `Generate a high-quality educational quiz to evaluate a student's knowledge.
-Subject: ${subject || 'Computer Science'}
-Topic: ${topic || 'General Assessment'}
-Target Difficulty: ${difficulty || 'intermediate'}
-Number of Questions: ${questionCount}
-${focusOnWeakAreas && weakSubtopics ? `CRITICAL FOCUS: The student has diagnosed weak areas in: [${weakSubtopics}]. Prioritize creating questions that diagnose and test these specific concepts!` : ''}
-
-You must return a JSON array of objects conforming to the schema. Make questions conceptually rigorous, realistic, and with clear pedagogical distractors (common student misconceptions).`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              question: { type: Type.STRING },
-              options: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              correctAnswerIndex: { type: Type.INTEGER },
-              subtopic: { type: Type.STRING },
-              difficulty: { type: Type.STRING },
-              hint: { type: Type.STRING },
-              explanation: { type: Type.STRING },
-            },
-            required: ['id', 'question', 'options', 'correctAnswerIndex', 'subtopic', 'difficulty', 'hint', 'explanation'],
-          },
-        },
-      },
-    });
-
-    const questions = JSON.parse(response.text || '[]');
-    res.json({
-      success: true,
-      quiz: {
-        id: `quiz-gen-${Date.now()}`,
-        subject: subject || 'Computer Science',
-        topic: topic || 'Adaptive Diagnostic',
-        difficulty: difficulty || 'adaptive',
-        questions,
-        source: 'gemini',
-      },
-    });
-  } catch (error: any) {
-    console.error('Error generating quiz with Gemini, utilizing curated pedagogical fallback:', error);
-    // Use curated fallback quizzes
-    const fallbackQuizzes = getFallbackQuizList(subject, difficulty);
-    res.json({
-      success: true,
-      quiz: {
-        id: `quiz-gen-${Date.now()}`,
-        subject: subject || 'Computer Science',
-        topic: topic || 'Adaptive Diagnostic Drill',
-        difficulty: difficulty || 'adaptive',
-        questions: fallbackQuizzes.slice(0, questionCount),
-        source: 'curated_resilience_engine',
-      },
-    });
-  }
+  res.json({
+    success: true,
+    quiz: {
+      id: `quiz-gen-${Date.now()}`,
+      subject: subject || 'Computer Science',
+      topic: topic || 'Adaptive Diagnostic Drill',
+      difficulty: difficulty || 'adaptive',
+      questions: fallbackQuizzes.slice(0, questionCount),
+      source: 'curated_resilience_engine',
+    },
+  });
 });
 
-// 4. Quiz Evaluation & Student Performance Analysis (ML/Analytics Engine)
+// 5. Quiz Evaluation & Student Performance Analysis
 app.post('/api/quiz/evaluate', async (req: Request, res: Response) => {
   const { quizId, subject, topic, answers, timeSpentSeconds = 120 } = req.body;
   const student = mockStudents[currentStudentId] || mockStudents['student-1'];
@@ -858,8 +808,7 @@ app.post('/api/quiz/evaluate', async (req: Request, res: Response) => {
   const updatedMastery = Math.min(100, Math.max(10, Math.round(currentMastery * 0.7 + percentage * 0.3)));
   student.masteryLevels[topic || subject] = updatedMastery;
 
-  // Machine Learning / Rule-based Weak Area Detection
-  // Aggregate errors in missed subtopics
+  // Rule-based Weak Area Detection
   const detectedWeakSubtopics: string[] = Array.from(new Set(missedSubtopics));
   detectedWeakSubtopics.forEach((sub) => {
     const existing = student.weakAreas.find((w) => w.subtopic.toLowerCase() === sub.toLowerCase());
@@ -893,38 +842,12 @@ app.post('/api/quiz/evaluate', async (req: Request, res: Response) => {
   });
 
   let aiFeedback = '';
-  if (ai) {
-    try {
-      const evalPrompt = `You are an expert AI Tutor analyzing a student's quiz performance.
-Student Name: ${student.name}
-Quiz Subject: ${subject} (${topic})
-Score: ${correctCount}/${answers.length} (${percentage}%)
-Missed Subtopics: ${missedSubtopics.length > 0 ? missedSubtopics.join(', ') : 'None! Perfect score.'}
-Time Spent: ${timeSpentSeconds} seconds
-
-Provide:
-1. An encouraging, constructive pedagogical feedback comment (2-3 sentences).
-2. Direct insight into what misconception likely caused any missed questions.
-3. 2 actionable study recommendations for immediate next steps.`;
-
-      const aiResponse = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: evalPrompt,
-      });
-      aiFeedback = aiResponse.text || '';
-    } catch (e) {
-      console.warn('AI feedback generation failed, using template feedback', e);
-    }
-  }
-
-  if (!aiFeedback) {
-    if (percentage >= 80) {
-      aiFeedback = `Outstanding work! You demonstrated strong mastery of ${topic || subject}. Keep up the high focus, and try advancing to higher difficulty challenges.`;
-    } else if (percentage >= 50) {
-      aiFeedback = `Solid effort! You have a good foundation, but watch out for edge cases in ${missedSubtopics[0] || 'the core subtopics'}. Revisiting step-by-step examples will quickly bridge this gap.`;
-    } else {
-      aiFeedback = `Don't be discouraged! Quizzes exist to pinpoint exactly where learning happens. We've flagged ${missedSubtopics.join(', ')} in your personalized study plan so you can review bite-sized lessons.`;
-    }
+  if (percentage >= 80) {
+    aiFeedback = `Outstanding work! You demonstrated strong mastery of ${topic || subject} (${percentage}% score). Keep up the high focus, and try advancing to higher difficulty challenges.`;
+  } else if (percentage >= 50) {
+    aiFeedback = `Solid effort! You scored ${percentage}%, showing good fundamentals, but watch out for edge cases in ${missedSubtopics[0] || 'the core subtopics'}. Revisiting step-by-step examples will quickly bridge this gap.`;
+  } else {
+    aiFeedback = `Don't be discouraged! Quizzes exist to pinpoint exactly where learning happens. We've flagged ${missedSubtopics.join(', ') || 'the missed topics'} in your personalized study plan so you can review bite-sized lessons.`;
   }
 
   student.achievements = computeStudentAchievements(student);
@@ -944,119 +867,14 @@ Provide:
   });
 });
 
-// 5. Personalized Learning Material Recommendations
+// 6. Personalized Learning Material Recommendations
 app.post('/api/recommendations', async (req: Request, res: Response) => {
   const { subject, weakAreas } = req.body;
   const student = mockStudents[currentStudentId] || mockStudents['student-1'];
   const targets = weakAreas || student.weakAreas.map((w) => w.subtopic);
+  const recommendations = getFallbackRecommendations(subject, targets);
 
-  if (!ai || targets.length === 0) {
-    return res.json({
-      success: true,
-      recommendations: {
-        flashcards: [
-          {
-            id: 'fc-1',
-            front: 'What are the two essential components of any valid recursive function?',
-            back: '1. Base Case: The condition that terminates recursion.\n2. Recursive Step: The rule that reduces the problem towards the base case.',
-            subtopic: 'Recursion Fundamentals',
-          },
-          {
-            id: 'fc-2',
-            front: 'Why does an infinite recursion cause a "Stack Overflow" error?',
-            back: 'Every function call pushes a stack frame with parameters and local variables onto the call stack. Without a terminating base case, stack memory exceeds its allocated limit.',
-            subtopic: 'Call Stack Mechanics',
-          },
-          {
-            id: 'fc-3',
-            front: 'What is the Big-O time complexity of Binary Search and why?',
-            back: 'O(log n). At each iteration, the search interval is halved, reducing the problem size exponentially.',
-            subtopic: 'Algorithm Analysis',
-          },
-        ],
-        studyGuides: [
-          {
-            title: 'Visualizing Call Stacks & Avoiding Recursion Pitfalls',
-            estimatedMinutes: 6,
-            keyTakeaway: 'Always write and test your base case first. Trace with n=0 and n=1 before larger inputs.',
-            actionPrompt: 'Practice with Fibonacci vs Factorial recursive tracing tree.',
-          },
-          {
-            title: 'Mastering Asymptotic Notation (Big-O, Big-Theta, Big-Omega)',
-            estimatedMinutes: 8,
-            keyTakeaway: 'Big-O describes upper bound worst-case growth rate as input size n approaches infinity.',
-            actionPrompt: 'Identify nested loop dependencies where the inner loop runs j < i iterations.',
-          },
-        ],
-        remedialDrillPlan: [
-          'Step 1: Ask the AI Tutor to walk through a call stack visualization.',
-          'Step 2: Solve 3 targeted beginner quiz questions focused strictly on base case termination.',
-          'Step 3: Review the flashcards above once in the morning and once in the evening for spaced repetition.',
-        ],
-      },
-    });
-  }
-
-  try {
-    const prompt = `Generate tailored remedial learning materials for a student struggling in these areas: [${targets.join(', ')}].
-Subject: ${subject || student.preferredSubject}
-
-Return a JSON object containing:
-- flashcards: array of 3-4 objects with { id, front, back, subtopic }
-- studyGuides: array of 2-3 objects with { title, estimatedMinutes, keyTakeaway, actionPrompt }
-- remedialDrillPlan: array of 3-4 sequential action steps (strings) to achieve mastery.`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            flashcards: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  front: { type: Type.STRING },
-                  back: { type: Type.STRING },
-                  subtopic: { type: Type.STRING },
-                },
-                required: ['id', 'front', 'back', 'subtopic'],
-              },
-            },
-            studyGuides: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  estimatedMinutes: { type: Type.INTEGER },
-                  keyTakeaway: { type: Type.STRING },
-                  actionPrompt: { type: Type.STRING },
-                },
-                required: ['title', 'estimatedMinutes', 'keyTakeaway', 'actionPrompt'],
-              },
-            },
-            remedialDrillPlan: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-          required: ['flashcards', 'studyGuides', 'remedialDrillPlan'],
-        },
-      },
-    });
-
-    const recommendations = JSON.parse(response.text || '{}');
-    res.json({ success: true, recommendations });
-  } catch (error: any) {
-    console.error('Error generating recommendations with Gemini, using curated fallback:', error);
-    const fallbackRecs = getFallbackRecommendations(subject, targets);
-    res.json({ success: true, recommendations: fallbackRecs });
-  }
+  res.json({ success: true, recommendations });
 });
 
 // Setup Vite middleware in dev or static files in production
