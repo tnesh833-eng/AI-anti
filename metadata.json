@@ -1,0 +1,6 @@
+{
+  "name": "Intelligent Tutor - AI-Based Learning System",
+  "description": "An AI-powered personalized learning system featuring NLP tutoring, adaptive quizzes, automated student performance evaluation, weak area diagnosis, and tailored study recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

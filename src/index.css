@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-serif: "EB Garamond", serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-surface: #FAF9F7;
+  --color-surface-low: #F4F2EE;
+  --color-surface-card: #FFFFFF;
+  --color-surface-border: #E5E1D8;
+  
+  --color-primary: #0D1B2A;
+  --color-primary-hover: #1B2A4A;
+  
+  --color-brass: #A17F3B;
+  --color-brass-light: #E9C176;
+  --color-brass-subtle: #F6F0E4;
+  
+  --color-muted: #5A6065;
+  --color-border: #E2DED6;
+}
+
+@layer base {
+  body {
+    @apply font-sans antialiased bg-surface text-primary selection:bg-brass-light selection:text-primary min-h-screen flex flex-col;
+  }
+}
