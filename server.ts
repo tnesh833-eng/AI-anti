@@ -27,7 +27,7 @@ if (apiKey) {
 }
 
 // SerpApi Key Configuration for Real-Time Question Answering & Web Grounding
-const SERPAPI_KEY = process.env.SERPAPI_API_KEY || 'b11626acb748e50db22e798db1187dbe9a317874b75aebcf86bcbcd4ca0267e5';
+const SERPAPI_KEY = process.env.SERPAPI_API_KEY || '';
 
 interface SerpSource {
   title: string;
@@ -44,6 +44,9 @@ interface SerpSearchResponse {
 }
 
 async function fetchSerpApiSearch(query: string): Promise<SerpSearchResponse | null> {
+  if (!SERPAPI_KEY) {
+    return null;
+  }
   try {
     const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${SERPAPI_KEY}`;
     const res = await fetch(url);
