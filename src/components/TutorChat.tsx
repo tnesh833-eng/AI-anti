@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Send,
@@ -15,11 +20,11 @@ import {
   AlertCircle,
   Compass,
   Globe,
+  Bot,
   ExternalLink,
-  ChevronDown,
-  ChevronUp,
+  Brain,
 } from 'lucide-react';
-import { ChatMessage, StudentProfile, TutorMode, SerpSource } from '../types.ts';
+import { ChatMessage, StudentProfile, TutorMode } from '../types.ts';
 
 interface TutorChatProps {
   student: StudentProfile | null;
@@ -34,10 +39,10 @@ const STARTER_PROMPTS = [
     text: 'How does the operating system call stack keep track of recursive function returns, and what causes a stack overflow?',
   },
   {
-    label: 'Real-Time: Latest AI Models',
+    label: 'Latest AI Paradigms',
     subject: 'Artificial Intelligence',
     mode: 'deep_dive' as TutorMode,
-    text: 'What are the newest architectural paradigms in AI reasoning and large multimodal models this year?',
+    text: 'What are the newest architectural paradigms in AI reasoning models and multimodal grounding this year?',
   },
   {
     label: 'Big-O vs Nested Loops',
@@ -58,11 +63,11 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
     {
       id: 'welcome',
       role: 'assistant',
-      content: `### Welcome to Live Tutoring! 🎓\n\nI am your expert human tutor. I am here to provide real-time, personalized guidance.\n\n* **Identified Weak Areas**: ${
+      content: `### Welcome to the Intelligent AI Tutor & Study Assistant! 🎓\n\nI am your personalized AI tutor powered by Gemini. I adapt to your unique learning style, track your mastery levels, and help resolve knowledge gaps.\n\n* **Identified Weak Areas**: ${
         student?.weakAreas.length
           ? student.weakAreas.map((w) => `\`${w.subtopic}\``).join(', ')
-          : 'None detected yet—take a diagnostic quiz to identify focus areas!'
-      }\n\n* **Live Connection**: You are now connected to a subject matter expert. Feel free to ask any question!`,
+          : 'None detected yet—take a diagnostic quiz to pinpoint focus areas!'
+      }\n\n* **Active Student Model**: Tailored specifically for **${student?.name || 'you'}** (${student?.gradeLevel || 'STEM Scholar'}).\n\nAsk me any concept, request Socratic hints, or select one of the study prompts below!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -73,11 +78,10 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
   const [isLoading, setIsLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync subject when student changes
   useEffect(() => {
     if (student?.preferredSubject) {
       setSelectedSubject(student.preferredSubject);
@@ -88,7 +92,6 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Clean up speech synthesis on unmount
   useEffect(() => {
     return () => {
       if ('speechSynthesis' in window) {
@@ -98,38 +101,41 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
   }, []);
 
   const handleSendMessage = async (textToSend?: string) => {
-    const query = textToSend || inputText;
-    if (!query.trim() || isLoading) return;
+    const query = (textToSend || inputText).trim();
+    if (!query || isLoading) return;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: query.trim(),
+      content: query,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       subject: selectedSubject,
       mode: tutorMode,
-      isRealTimeSearch: enableRealTimeSearch,
     };
 
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    setMessages((prev) => [...prev, userMsg]);
     setInputText('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/tutor/chat', {
+      const historyPayload = messages.slice(-5).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      historyPayload.push({ role: 'user', content: query });
+
+      const res = await fetch('/api/tutor/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+          messages: historyPayload,
           subject: selectedSubject,
           mode: tutorMode,
           enableRealTimeSearch,
         }),
       });
 
-      const data = await response.json();
-
+      const data = await res.json();
       if (data.success && data.reply) {
         const assistantMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
@@ -151,20 +157,13 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: `⚠️ **Tutoring Service Notice**: The tutor is currently experiencing connection issues. Please try again or review the foundational definitions in **${selectedSubject}**!`,
+        content: `⚠️ **Tutoring Notice**: I experienced a temporary connection delay. Please ask again or try switching tutoring modes!`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const toggleSources = (msgId: string) => {
-    setExpandedSources((prev) => ({
-      ...prev,
-      [msgId]: !prev[msgId],
-    }));
   };
 
   const handleSpeak = (messageId: string, text: string) => {
@@ -221,7 +220,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
       if (line.startsWith('```')) {
         if (inCodeBlock) {
           elements.push(
-            <div key={`code-${index}`} className="my-3 bg-slate-900 border border-slate-700/80 rounded-lg p-3 overflow-x-auto text-xs font-mono text-emerald-300">
+            <div key={`code-${index}`} className="my-3 bg-primary text-emerald-300 border border-slate-700 rounded-xl p-3.5 overflow-x-auto text-xs font-mono shadow-inner">
               <pre>{codeBuffer.join('\n')}</pre>
             </div>
           );
@@ -240,21 +239,21 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
 
       if (line.startsWith('### ')) {
         elements.push(
-          <h4 key={index} className="text-base font-bold text-indigo-200 mt-3 mb-1.5 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400 inline" />
+          <h4 key={index} className="font-serif text-base font-bold text-brass mt-3 mb-1.5 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-brass inline" />
             {line.replace('### ', '')}
           </h4>
         );
       } else if (line.startsWith('## ')) {
         elements.push(
-          <h3 key={index} className="text-lg font-bold text-white mt-4 mb-2">
+          <h3 key={index} className="font-serif text-lg font-bold text-primary mt-4 mb-2">
             {line.replace('## ', '')}
           </h3>
         );
       } else if (line.startsWith('* ') || line.startsWith('- ')) {
         const itemContent = line.replace(/^[\*\-]\s+/, '');
         elements.push(
-          <li key={index} className="ml-5 list-disc text-slate-200 text-sm leading-relaxed my-0.5">
+          <li key={index} className="ml-5 list-disc text-primary font-serif text-sm leading-relaxed my-0.5">
             {formatInlineText(itemContent)}
           </li>
         );
@@ -262,7 +261,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
         elements.push(<div key={index} className="h-2" />);
       } else {
         elements.push(
-          <p key={index} className="text-sm text-slate-200 leading-relaxed">
+          <p key={index} className="font-serif text-sm text-primary leading-relaxed">
             {formatInlineText(line)}
           </p>
         );
@@ -271,7 +270,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
 
     if (inCodeBlock && codeBuffer.length > 0) {
       elements.push(
-        <div key="code-final" className="my-3 bg-slate-900 border border-slate-700 rounded-lg p-3 overflow-x-auto text-xs font-mono text-emerald-300">
+        <div key="code-final" className="my-3 bg-primary text-emerald-300 border border-slate-700 rounded-xl p-3.5 overflow-x-auto text-xs font-mono shadow-inner">
           <pre>{codeBuffer.join('\n')}</pre>
         </div>
       );
@@ -281,7 +280,6 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
   };
 
   const formatInlineText = (text: string) => {
-    // Handle Markdown links [text](url)
     const linkRegex = /\[(.*?)\]\((.*?)\)/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
@@ -299,10 +297,10 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
           href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-indigo-400 hover:text-indigo-300 underline font-medium inline-flex items-center gap-0.5"
+          className="text-brass hover:text-primary underline font-medium inline-flex items-center gap-1 font-serif"
         >
           {linkText}
-          <ExternalLink className="w-3 h-3 inline ml-0.5" />
+          <ExternalLink className="w-3 h-3 inline" />
         </a>
       );
       lastIndex = linkRegex.lastIndex;
@@ -320,14 +318,14 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return (
-          <strong key={i} className="font-semibold text-white">
+          <strong key={i} className="font-bold text-primary font-serif">
             {part.slice(2, -2)}
           </strong>
         );
       }
       if (part.startsWith('`') && part.endsWith('`')) {
         return (
-          <code key={i} className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-indigo-300 text-xs font-mono">
+          <code key={i} className="px-1.5 py-0.5 rounded bg-surface border border-border text-primary text-xs font-mono">
             {part.slice(1, -1)}
           </code>
         );
@@ -337,365 +335,252 @@ export const TutorChat: React.FC<TutorChatProps> = ({ student, onNavigateToQuiz 
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-w-6xl mx-auto px-4 sm:px-6 py-4 animate-slide-up">
-      {/* Top Controls: Subject, Mode, Real-Time SerpApi Grounding, Reset */}
-      <div className="glass-panel rounded-2xl p-3 mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Subject selector */}
-          <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs">
-            <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="bg-transparent text-slate-100 font-medium outline-none cursor-pointer pr-1"
-            >
-              <option value="Computer Science" className="bg-slate-800">Computer Science</option>
-              <option value="Physics & Mechanics" className="bg-slate-800">Physics & Mechanics</option>
-              <option value="Mathematics & Calculus" className="bg-slate-800">Mathematics & Calculus</option>
-              <option value="Artificial Intelligence" className="bg-slate-800">Artificial Intelligence</option>
-              <option value="Chemistry" className="bg-slate-800">Chemistry</option>
-            </select>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      {/* Top Header Card (Classical Scholastic Style) */}
+      <div className="bg-surface-card border border-border rounded-2xl p-6 sm:p-7 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-brass-subtle border border-brass-light/70 flex items-center justify-center text-brass shadow-2xs shrink-0">
+              <Brain className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="font-serif text-2xl font-bold text-primary tracking-tight">
+                Interactive AI Socratic Tutor
+              </h2>
+              <p className="font-serif text-xs sm:text-sm text-muted mt-0.5">
+                Scholastic pedagogical dialogue calibrated for collegiate understanding & first principles
+              </p>
+            </div>
           </div>
 
-          {/* Mode Selector Buttons */}
-          <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60 overflow-x-auto">
+          {/* Quick Shortcuts */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {student?.weakAreas && student.weakAreas.length > 0 && (
+              <button
+                onClick={() => onNavigateToQuiz(selectedSubject, student.weakAreas[0].subtopic)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-serif font-semibold bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+              >
+                <AlertCircle className="w-4 h-4 text-rose-700" />
+                <span>Quiz on Weak Area</span>
+              </button>
+            )}
+
             <button
-              onClick={() => setTutorMode('socratic')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                tutorMode === 'socratic'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-300 hover:text-white'
+              onClick={() => setEnableRealTimeSearch(!enableRealTimeSearch)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-serif font-semibold border transition-all cursor-pointer ${
+                enableRealTimeSearch
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-surface-low text-muted border-border hover:text-primary'
               }`}
-              title="Guides you step-by-step with leading questions rather than answers"
             >
-              <User className="w-3 h-3" />
-              Socratic Guide
+              <Globe className={`w-3.5 h-3.5 ${enableRealTimeSearch ? 'text-emerald-700' : 'text-muted'}`} />
+              <span>{enableRealTimeSearch ? 'Grounding On' : 'Grounding Off'}</span>
             </button>
+
             <button
-              onClick={() => setTutorMode('deep_dive')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                tutorMode === 'deep_dive'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-              title="Rigorous technical breakdown and formal proofs"
+              onClick={handleClearHistory}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-serif font-semibold bg-surface-low hover:bg-surface text-muted hover:text-primary border border-border transition-colors cursor-pointer"
+              title="Reset conversation"
             >
-              <Compass className="w-3 h-3" />
-              Deep Dive
-            </button>
-            <button
-              onClick={() => setTutorMode('eli5')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                tutorMode === 'eli5'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-              title="Explain like I am 12 with simple real-world analogies"
-            >
-              <Lightbulb className="w-3 h-3" />
-              ELI5 Analogy
-            </button>
-            <button
-              onClick={() => setTutorMode('practice')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                tutorMode === 'practice'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-              title="Provides a challenge problem and step-by-step walkthrough"
-            >
-              <HelpCircle className="w-3 h-3" />
-              Practice Drill
-            </button>
-            <button
-              onClick={() => setTutorMode('code_debug')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                tutorMode === 'code_debug'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-              title="Analyzes algorithmic logic & code traps"
-            >
-              <Code2 className="w-3 h-3" />
-              Code Debug
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear</span>
             </button>
           </div>
         </div>
 
-        {/* Real-time search toggle & actions */}
-        <div className="flex items-center gap-2">
-          {/* Real-Time SerpApi Grounding Toggle */}
-          <button
-            onClick={() => setEnableRealTimeSearch(!enableRealTimeSearch)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
-              enableRealTimeSearch
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
-                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
-            title="Toggle priority support"
-          >
-            <Globe className={`w-3.5 h-3.5 ${enableRealTimeSearch ? 'text-emerald-400' : 'text-slate-400'}`} />
-            <span>{enableRealTimeSearch ? 'Priority Support On' : 'Priority Support Off'}</span>
-          </button>
+        {/* Controls Toolbar: Subject & Mode Selector */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-5 pt-4 border-t border-border">
+          {/* Subject Dropdown */}
+          <div className="md:col-span-4">
+            <div className="relative">
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full bg-surface-low border border-border rounded-xl px-3.5 py-2 text-xs font-serif font-semibold text-primary focus:outline-hidden focus:border-brass transition-colors cursor-pointer"
+              >
+                <option value="Computer Science">Computer Science & Algorithms</option>
+                <option value="Physics & Mechanics">Physics & Mechanics</option>
+                <option value="Mathematics & Calculus">Mathematics & Calculus</option>
+                <option value="Artificial Intelligence">Artificial Intelligence & ML</option>
+                <option value="Chemistry">General Chemistry</option>
+              </select>
+            </div>
+          </div>
 
-          {student?.weakAreas && student.weakAreas.length > 0 && (
-            <button
-              onClick={() => onNavigateToQuiz(selectedSubject, student.weakAreas[0].subtopic)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition-colors"
-              title="Launch adaptive quiz targeting your diagnosed weak area"
-            >
-              <AlertCircle className="w-3.5 h-3.5" />
-              Quiz on Weak Area
-            </button>
-          )}
-
-          <button
-            onClick={handleClearHistory}
-            className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors"
-            title="Clear conversation"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+          {/* Mode Selector Pills */}
+          <div className="md:col-span-8 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {(
+              [
+                { id: 'socratic', label: 'Socratic Guide', icon: User },
+                { id: 'deep_dive', label: 'Deep Dive', icon: Compass },
+                { id: 'eli5', label: 'ELI5 Analogy', icon: Lightbulb },
+                { id: 'practice', label: 'Practice Drill', icon: HelpCircle },
+                { id: 'code_debug', label: 'Code Debug', icon: Code2 },
+              ] as const
+            ).map((m) => {
+              const Icon = m.icon;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setTutorMode(m.id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-serif font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    tutorMode === m.id
+                      ? 'bg-primary text-white border border-brass shadow-xs'
+                      : 'bg-surface-low text-primary border border-border hover:bg-surface'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{m.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Chat Messages Log */}
-      <div className="flex-1 overflow-y-auto glass-panel rounded-2xl p-4 sm:p-5 space-y-4 shadow-inner">
-        {messages.map((message) => {
-          const isUser = message.role === 'user';
-          const hasSources = message.sources && message.sources.length > 0;
-          const hasRelated = message.relatedQuestions && message.relatedQuestions.length > 0;
-          const isSourceExpanded = expandedSources[message.id] ?? false;
-
-          return (
+      {/* Main Chat Conversation Container */}
+      <div className="bg-surface-card border border-border rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col h-[600px]">
+        {/* Messages Stream */}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {messages.map((m) => (
             <div
-              key={message.id}
-              className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
+              key={m.id}
+              className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              {!isUser && (
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shrink-0 shadow-md">
-                  <User className="w-4 h-4 text-white" />
+              {m.role === 'assistant' && (
+                <div className="w-9 h-9 rounded-xl bg-brass-subtle border border-brass-light/70 text-brass flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <Bot className="w-5 h-5" />
                 </div>
               )}
 
               <div
-                className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 shadow-md ${
-                  isUser
-                    ? 'bg-indigo-600 text-white rounded-tr-none'
-                    : 'bg-slate-800/90 text-slate-100 border border-slate-700/60 rounded-tl-none'
+                className={`max-w-[85%] rounded-2xl p-5 leading-relaxed relative ${
+                  m.role === 'user'
+                    ? 'bg-primary text-white rounded-tr-none shadow-xs font-serif'
+                    : 'bg-brass-subtle/40 border border-brass-light/60 text-primary rounded-tl-none font-serif shadow-2xs'
                 }`}
               >
-                {/* Meta details for assistant message */}
-                {!isUser && (
-                  <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2 text-[11px] text-slate-400">
-                    <span className="flex items-center gap-1 text-indigo-300 font-medium">
-                      <Sparkles className="w-3 h-3" />
-                      Expert Tutor • {message.mode ? message.mode.replace('_', ' ').toUpperCase() : 'Live'}
-                      {message.isRealTimeSearch && (
-                        <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold inline-flex items-center gap-1">
-                          <Check className="w-2.5 h-2.5" />
-                          Verified
-                        </span>
-                      )}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleSpeak(message.id, message.content)}
-                        className="hover:text-indigo-300 transition-colors p-0.5"
-                        title={speakingMessageId === message.id ? 'Stop reading' : 'Read explanation aloud'}
-                      >
-                        {speakingMessageId === message.id ? (
-                          <VolumeX className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-                        ) : (
-                          <Volume2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleCopy(message.id, message.content)}
-                        className="hover:text-indigo-300 transition-colors p-0.5"
-                        title="Copy to clipboard"
-                      >
-                        {copiedId === message.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <span>{message.timestamp}</span>
-                    </div>
-                  </div>
-                )}
+                <div>{renderFormattedMarkdown(m.content)}</div>
 
-                {/* Content */}
-                <div className="space-y-1">
-                  {isUser ? (
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  ) : (
-                    <div>{renderFormattedMarkdown(message.content)}</div>
-                  )}
-                </div>
-
-                {/* Real-Time SerpApi Grounding Sources Section */}
-                {!isUser && hasSources && (
-                  <div className="mt-3 pt-3 border-t border-slate-700/60">
-                    <button
-                      onClick={() => toggleSources(message.id)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Globe className="w-3.5 h-3.5" />
-                        Verified Web Sources ({message.sources!.length})
-                      </span>
-                      {isSourceExpanded ? (
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-
-                    {isSourceExpanded && (
-                      <div className="mt-2 space-y-2">
-                        {message.sources!.map((source, sIdx) => (
-                          <a
-                            key={sIdx}
-                            href={source.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-2 rounded-xl bg-slate-900/80 border border-slate-700/80 hover:border-indigo-500/60 transition-all text-xs group"
-                          >
-                            <div className="flex items-center justify-between text-indigo-300 font-semibold group-hover:text-indigo-200">
-                              <span className="truncate pr-2">{source.title}</span>
-                              <ExternalLink className="w-3 h-3 shrink-0 opacity-60 group-hover:opacity-100" />
-                            </div>
-                            <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2">
-                              {source.snippet}
-                            </p>
-                            {source.source && (
-                              <span className="inline-block mt-1 text-[10px] text-slate-500 font-mono">
-                                {source.source}
-                              </span>
-                            )}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* People Also Ask (Real-Time Questions) */}
-                {!isUser && hasRelated && (
-                  <div className="mt-3 pt-2.5 border-t border-slate-700/40">
-                    <span className="text-[11px] font-semibold text-slate-400 block mb-1.5 flex items-center gap-1">
-                      <HelpCircle className="w-3 h-3 text-indigo-400" />
-                      People Also Ask (Live Google Queries):
+                {/* Sources if present */}
+                {m.sources && m.sources.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted block mb-1.5">
+                      Grounding References:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {message.relatedQuestions!.map((q, qIdx) => (
-                        <button
-                          key={qIdx}
-                          onClick={() => handleSendMessage(q)}
-                          disabled={isLoading}
-                          className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-indigo-200 hover:text-white hover:bg-slate-750 transition-colors text-left"
+                      {m.sources.slice(0, 3).map((s, idx) => (
+                        <a
+                          key={idx}
+                          href={s.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface border border-border text-[11px] text-brass hover:text-primary font-serif font-medium"
                         >
-                          → {q}
-                        </button>
+                          <span className="truncate max-w-[140px]">{s.title}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {isUser && (
-                  <div className="text-[10px] text-indigo-200 mt-1 text-right">
-                    {message.timestamp}
+                {/* Footer of assistant message */}
+                {m.role === 'assistant' && (
+                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-brass-light/40 text-[11px] text-muted font-mono">
+                    <span>{m.timestamp}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleSpeak(m.id, m.content)}
+                        className="hover:text-primary transition-colors cursor-pointer"
+                        title={speakingMessageId === m.id ? 'Stop audio' : 'Read aloud'}
+                      >
+                        {speakingMessageId === m.id ? (
+                          <VolumeX className="w-3.5 h-3.5 text-rose-700 animate-pulse" />
+                        ) : (
+                          <Volume2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCopy(m.id, m.content)}
+                        className="hover:text-primary transition-colors cursor-pointer"
+                        title="Copy text"
+                      >
+                        {copiedId === m.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-700" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
+
+              {m.role === 'user' && (
+                <div className="w-9 h-9 rounded-xl bg-surface-low border border-border text-primary flex items-center justify-center shrink-0 mt-0.5 font-bold font-serif text-sm">
+                  {student?.name?.charAt(0) || 'S'}
+                </div>
+              )}
             </div>
-          );
-        })}
+          ))}
 
-        {isLoading && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shrink-0 animate-pulse">
-              <User className="w-4 h-4 text-white" />
+          {isLoading && (
+            <div className="flex items-center gap-3 text-xs text-brass font-serif bg-brass-subtle border border-brass-light/70 p-4 rounded-2xl rounded-tl-none w-fit shadow-2xs">
+              <Sparkles className="w-4 h-4 animate-spin text-brass" />
+              <span>AI Tutor is reasoning and synthesizing Socratic guidance...</span>
             </div>
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 rounded-tl-none text-slate-300 text-sm flex items-center gap-3">
-              <div className="flex space-x-1.5">
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-              <span className="text-xs text-slate-400">
-                Tutor is typing...
-              </span>
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Prompt Starters */}
-      <div className="py-2 flex items-center gap-2 overflow-x-auto scrollbar-none">
-        <span className="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-indigo-400" />
-          Quick Ask:
-        </span>
-        {STARTER_PROMPTS.map((prompt, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setSelectedSubject(prompt.subject);
-              setTutorMode(prompt.mode);
-              handleSendMessage(prompt.text);
-            }}
-            disabled={isLoading}
-            className="text-xs px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-700 whitespace-nowrap transition-all shadow-sm flex items-center gap-1.5"
-          >
-            <span>{prompt.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Input Box */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage();
-        }}
-        className="glass-panel border-t border-slate-700/50 rounded-2xl p-2 shadow-lg flex items-center gap-2 mt-1"
-      >
-        <div
-          className="flex items-center pl-2 text-slate-400"
-          title={enableRealTimeSearch ? 'SerpApi Live Search Active' : 'Live Search Off'}
-        >
-          <Globe
-            className={`w-4 h-4 ${enableRealTimeSearch ? 'text-emerald-400' : 'text-slate-500'}`}
-          />
+          )}
+          <div ref={messagesEndRef} />
         </div>
-        <textarea
-          rows={1}
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSendMessage();
-            }
-          }}
-          placeholder={`Ask the Expert Tutor anything in ${selectedSubject}...`}
-          className="flex-1 bg-transparent px-2 py-1.5 text-sm text-slate-100 placeholder-slate-500 outline-none resize-none max-h-32"
-          disabled={isLoading}
-        />
 
-        <button
-          type="submit"
-          disabled={!inputText.trim() || isLoading}
-          className="btn-primary flex items-center justify-center shrink-0 w-10 h-10 p-0 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+        {/* Starter Prompt Chips */}
+        <div className="pt-3 pb-2 border-t border-border">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {STARTER_PROMPTS.map((p, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setSelectedSubject(p.subject);
+                  setTutorMode(p.mode);
+                  handleSendMessage(p.text);
+                }}
+                disabled={isLoading}
+                className="px-3 py-1.5 rounded-full bg-surface-low hover:bg-brass-subtle text-primary border border-border hover:border-brass/60 font-serif text-xs font-medium whitespace-nowrap transition-all cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                ⚡ {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Input Field & Send Button */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage();
+          }}
+          className="pt-2 flex items-center gap-3"
         >
-          <Send className="w-4 h-4" />
-        </button>
-      </form>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder={`Ask AI Tutor about ${selectedSubject}, theorems, algorithms, or code...`}
+            disabled={isLoading}
+            className="flex-1 bg-surface-low border border-border rounded-xl px-4 py-3.5 text-sm font-serif text-primary placeholder-muted/60 focus:outline-hidden focus:border-brass transition-colors disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!inputText.trim() || isLoading}
+            className="h-12 px-6 rounded-xl bg-primary hover:bg-primary-hover active:scale-95 disabled:opacity-40 text-white font-serif font-semibold text-sm flex items-center justify-center gap-2 border border-brass/50 transition-all cursor-pointer shrink-0"
+          >
+            <span>Ask Tutor</span>
+            <Send className="w-4 h-4 text-brass-light" />
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

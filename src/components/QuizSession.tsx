@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState } from 'react';
 import {
   CheckCircle2,
@@ -12,6 +17,7 @@ import {
   Zap,
   Target,
   Brain,
+  Award,
 } from 'lucide-react';
 import { QuizQuestion, StudentProfile } from '../types.ts';
 
@@ -79,14 +85,13 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
       }
     } catch (err) {
       console.error('Quiz generation error:', err);
-      alert('Could not generate quiz right now. Please try again or switch subjects.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSelectOption = (optionIndex: number) => {
-    if (showExplanation) return; // Prevent changing after revealing
+    if (showExplanation) return;
     setSelectedAnswers((prev) => ({
       ...prev,
       [currentIndex]: optionIndex,
@@ -147,101 +152,73 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
     }
   };
 
-  // 1. If viewing Quiz Results
+  // 1. If viewing Quiz Results (Classical Light Styling)
   if (quizResults) {
     const isPassing = quizResults.percentage >= 70;
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-          {/* Header Badge */}
-          <div className="text-center mb-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <div className="bg-surface-card border border-border rounded-2xl p-6 sm:p-10 shadow-sm space-y-6">
+          {/* Header Seal */}
+          <div className="text-center pb-6 border-b border-border">
             <div
-              className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-3 shadow-lg ${
+              className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-3 shadow-xs border ${
                 isPassing
-                  ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-emerald-500/30'
-                  : 'bg-gradient-to-tr from-amber-500 to-rose-500 text-white shadow-rose-500/30'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}
             >
               <Trophy className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white">Quiz Evaluation Completed</h2>
-            <p className="text-slate-400 text-sm mt-1">
-              Performance diagnostics processed by the Intelligent Student Model
+            <h2 className="font-serif text-3xl font-bold text-primary">
+              {isPassing ? 'Diagnostic Benchmark Achieved' : 'Diagnostic Evaluation Complete'}
+            </h2>
+            <p className="text-muted text-sm mt-1 font-serif">
+              {selectedSubject} &bull; {selectedTopic || 'Adaptive Assessment'}
             </p>
           </div>
 
-          {/* Key Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
-              <span className="text-xs text-slate-400 font-medium">Final Score</span>
-              <p className="text-2xl font-bold text-white mt-1">
+          {/* Quick Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-surface-low border border-border rounded-xl p-3 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted block">Score</span>
+              <span className="font-serif text-2xl font-bold text-primary">
                 {quizResults.score} / {quizResults.totalQuestions}
-              </p>
+              </span>
             </div>
-            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
-              <span className="text-xs text-slate-400 font-medium">Accuracy</span>
-              <p
-                className={`text-2xl font-bold mt-1 ${
-                  isPassing ? 'text-emerald-400' : 'text-amber-400'
-                }`}
-              >
+            <div className="bg-surface-low border border-border rounded-xl p-3 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted block">Accuracy</span>
+              <span className={`font-serif text-2xl font-bold ${isPassing ? 'text-emerald-700' : 'text-amber-700'}`}>
                 {quizResults.percentage}%
-              </p>
+              </span>
             </div>
-            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
-              <span className="text-xs text-slate-400 font-medium">XP Earned</span>
-              <p className="text-2xl font-bold text-purple-400 mt-1">
-                +{quizResults.score * 50 + 20} XP
-              </p>
+            <div className="bg-surface-low border border-border rounded-xl p-3 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted block">Time Spent</span>
+              <span className="font-serif text-2xl font-bold text-primary">{quizResults.timeSpentSeconds}s</span>
             </div>
-            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
-              <span className="text-xs text-slate-400 font-medium">Topic Mastery</span>
-              <p className="text-2xl font-bold text-indigo-400 mt-1">
-                {quizResults.updatedMastery}%
-              </p>
+            <div className="bg-surface-low border border-border rounded-xl p-3 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted block">XP Earned</span>
+              <span className="font-serif text-2xl font-bold text-brass">+{quizResults.percentage * 2} XP</span>
             </div>
           </div>
 
-          {/* AI Pedagogical Feedback Box */}
-          <div className="bg-indigo-950/40 border border-indigo-800/50 rounded-2xl p-4 sm:p-5 mb-6">
-            <div className="flex items-center gap-2 text-indigo-300 font-semibold text-sm mb-2">
-              <Brain className="w-4 h-4 text-indigo-400" />
-              AI Tutor Diagnostic Feedback
-            </div>
-            <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-              {quizResults.aiFeedback}
-            </p>
-          </div>
-
-          {/* Detected Weak Areas Section */}
-          {quizResults.detectedWeakSubtopics && quizResults.detectedWeakSubtopics.length > 0 && (
-            <div className="bg-rose-950/30 border border-rose-900/40 rounded-2xl p-4 sm:p-5 mb-6">
-              <div className="flex items-center gap-2 text-rose-300 font-semibold text-sm mb-2">
-                <Target className="w-4 h-4 text-rose-400" />
-                Detected Knowledge Gaps & Misconceptions:
+          {/* AI Pedagogical Evaluation Feedback */}
+          {quizResults.aiFeedback && (
+            <div className="bg-brass-subtle/50 border border-brass-light/60 rounded-xl p-5 shadow-2xs">
+              <div className="flex items-center gap-2 text-brass font-serif font-bold text-sm mb-2">
+                <Sparkles className="w-4 h-4 text-brass" />
+                <span>Pedagogical Diagnostic Feedback</span>
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {quizResults.detectedWeakSubtopics.map((weak: string, idx: number) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                  >
-                    <span>⚠️</span>
-                    {weak}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-rose-200/80 mt-3">
-                These topics have been registered in your student profile and will receive priority remediation in the <strong>Study Recommendations</strong> tab.
+              <p className="font-serif text-primary text-sm leading-relaxed whitespace-pre-wrap">
+                {quizResults.aiFeedback}
               </p>
             </div>
           )}
 
-          {/* Question Breakdown List */}
-          <div className="border-t border-slate-800 pt-6 mb-6">
-            <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-indigo-400" />
-              Detailed Question Analysis
+          {/* Question Breakdown */}
+          <div className="pt-2">
+            <h3 className="font-serif text-lg font-bold text-primary mb-3 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-brass" />
+              <span>Detailed Question Analysis</span>
             </h3>
             <div className="space-y-3">
               {questions?.map((q, idx) => {
@@ -252,42 +229,42 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
                     key={q.id}
                     className={`p-4 rounded-xl border text-sm ${
                       isCorrect
-                        ? 'bg-emerald-950/20 border-emerald-900/40'
-                        : 'bg-rose-950/20 border-rose-900/40'
+                        ? 'bg-emerald-50/50 border-emerald-200'
+                        : 'bg-rose-50/40 border-rose-200'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         {isCorrect ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         ) : (
-                          <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                         )}
-                        <span className="font-semibold text-slate-200">
+                        <span className="font-serif font-bold text-primary">
                           Q{idx + 1}: {q.question}
                         </span>
                       </div>
-                      <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-surface border border-border text-muted shrink-0">
                         {q.subtopic}
                       </span>
                     </div>
 
-                    <div className="mt-2 text-xs text-slate-300 space-y-1">
+                    <div className="mt-2 text-xs font-serif text-muted space-y-1">
                       <p>
                         Your Answer:{' '}
-                        <span className={isCorrect ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium'}>
+                        <span className={isCorrect ? 'text-emerald-700 font-semibold' : 'text-rose-700 font-semibold'}>
                           {selected !== undefined ? q.options[selected] : 'No answer'}
                         </span>
                       </p>
                       {!isCorrect && (
                         <p>
                           Correct Answer:{' '}
-                          <span className="text-emerald-400 font-medium">
+                          <span className="text-emerald-700 font-semibold">
                             {q.options[q.correctAnswerIndex]}
                           </span>
                         </p>
                       )}
-                      <p className="text-slate-400 mt-1 italic">
+                      <p className="text-primary/80 mt-1 italic leading-relaxed">
                         <strong>Rationale:</strong> {q.explanation}
                       </p>
                     </div>
@@ -295,10 +272,10 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
                     {!isCorrect && (
                       <button
                         onClick={() => onAskTutorAboutMistake(q.question, q.explanation)}
-                        className="mt-2.5 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition-colors"
+                        className="mt-2.5 font-mono text-xs text-brass hover:text-primary flex items-center gap-1 font-medium transition-colors cursor-pointer"
                       >
                         <Brain className="w-3.5 h-3.5" />
-                        Ask AI Tutor to clarify this mistake
+                        Ask AI Tutor to clarify this misconception &rarr;
                       </button>
                     )}
                   </div>
@@ -308,23 +285,23 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
           </div>
 
           {/* Action Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border">
             <button
               onClick={() => {
                 setQuizResults(null);
                 setQuestions(null);
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-surface-low border border-border text-primary hover:bg-surface transition-colors cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4 text-muted" />
               Configure Another Quiz
             </button>
             <button
               onClick={startQuiz}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-hover text-white shadow-sm transition-all cursor-pointer"
             >
-              <Zap className="w-4 h-4" />
-              Retake Adaptive Drill
+              <Zap className="w-4 h-4 text-brass-light" />
+              Retake Diagnostic Drill
             </button>
           </div>
         </div>
@@ -332,7 +309,7 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
     );
   }
 
-  // 2. Active In-Progress Quiz Session
+  // 2. Active In-Progress Quiz Session (Classical Light Styling)
   if (questions && questions.length > 0) {
     const currentQ = questions[currentIndex];
     const hasSelected = selectedAnswers[currentIndex] !== undefined;
@@ -340,63 +317,63 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
     const isCorrect = selectedOption === currentQ.correctAnswerIndex;
 
     return (
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        {/* Progress & Header */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <div className="bg-surface-card border border-border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+          {/* Top Session Progress Bar */}
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono text-xs uppercase px-2.5 py-1 rounded bg-brass-subtle border border-brass-light/60 text-brass font-bold">
                 {selectedSubject}
               </span>
-              <span className="text-xs text-slate-400 capitalize">
-                • {currentQ.difficulty} Level
+              <span className="font-serif text-xs text-muted capitalize">
+                &bull; {currentQ.difficulty} Level
               </span>
             </div>
-            <div className="flex items-center gap-3 text-xs text-slate-400">
-              <span className="flex items-center gap-1 font-medium text-slate-300">
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="flex items-center gap-3 text-xs text-muted font-mono">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-brass" />
                 Live Session
               </span>
-              <span className="font-semibold text-white">
-                {currentIndex + 1} / {questions.length}
+              <span className="font-bold text-primary font-serif">
+                {currentIndex + 1} of {questions.length}
               </span>
             </div>
           </div>
 
-          {/* Question Progress Bar */}
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-6">
+          {/* Progress Indicator */}
+          <div className="w-full bg-surface-low h-1.5 rounded-full overflow-hidden">
             <div
-              className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full transition-all duration-300"
+              className="bg-brass h-full transition-all duration-300"
               style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
             />
           </div>
 
           {/* Question Text */}
-          <div className="mb-6">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-1 block">
+          <div>
+            <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-brass mb-1 block">
               Subtopic: {currentQ.subtopic}
             </span>
-            <h3 className="text-lg sm:text-xl font-bold text-white leading-relaxed">
+            <h3 className="font-serif text-xl sm:text-2xl font-bold text-primary leading-snug">
               {currentQ.question}
             </h3>
           </div>
 
-          {/* Options */}
-          <div className="space-y-3 mb-6">
+          {/* Answer Options */}
+          <div className="space-y-3">
             {currentQ.options.map((option, idx) => {
               const isOptionSelected = selectedOption === idx;
-              let optionStyle = 'border-slate-800 bg-slate-800/60 hover:bg-slate-800 text-slate-200';
+              let optionStyle = 'border-border bg-surface-card hover:bg-surface-low text-primary';
 
               if (showExplanation) {
                 if (idx === currentQ.correctAnswerIndex) {
-                  optionStyle = 'border-emerald-500/80 bg-emerald-950/40 text-emerald-200 font-medium';
+                  optionStyle = 'border-emerald-500 bg-emerald-50/70 text-emerald-900 font-semibold';
                 } else if (isOptionSelected) {
-                  optionStyle = 'border-rose-500/80 bg-rose-950/40 text-rose-200';
+                  optionStyle = 'border-rose-400 bg-rose-50 text-rose-900';
                 } else {
-                  optionStyle = 'border-slate-800/50 bg-slate-800/20 text-slate-400 opacity-60';
+                  optionStyle = 'border-border bg-surface-low text-muted opacity-50';
                 }
               } else if (isOptionSelected) {
-                optionStyle = 'border-indigo-500 bg-indigo-950/50 text-indigo-100 ring-2 ring-indigo-500/30';
+                optionStyle = 'border-brass bg-brass-subtle/80 text-primary font-semibold ring-1 ring-brass';
               }
 
               return (
@@ -404,28 +381,28 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
                   key={idx}
                   onClick={() => handleSelectOption(idx)}
                   disabled={showExplanation}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all duration-150 flex items-center justify-between text-sm ${optionStyle}`}
+                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between text-sm cursor-pointer ${optionStyle}`}
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
                         isOptionSelected
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-700/80 text-slate-300'
+                          ? 'bg-primary text-white'
+                          : 'bg-surface-low border border-border text-muted'
                       }`}
                     >
                       {String.fromCharCode(65 + idx)}
                     </span>
-                    <span>{option}</span>
+                    <span className="font-serif text-base">{option}</span>
                   </div>
 
                   {showExplanation && (
                     <div>
                       {idx === currentQ.correctAnswerIndex && (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                       )}
                       {isOptionSelected && idx !== currentQ.correctAnswerIndex && (
-                        <XCircle className="w-5 h-5 text-rose-400" />
+                        <XCircle className="w-5 h-5 text-rose-600" />
                       )}
                     </div>
                   )}
@@ -434,83 +411,83 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
             })}
           </div>
 
-          {/* Hint Card Toggle */}
+          {/* Socratic Hint */}
           {!showExplanation && (
-            <div className="mb-4">
+            <div>
               <button
                 onClick={() => setShowHint(!showHint)}
-                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition-colors font-medium"
+                className="font-mono text-xs text-brass hover:text-primary flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
-                {showHint ? 'Hide Pedagogical Hint' : 'Need a hint? (Socratic Prompt)'}
+                {showHint ? 'Hide Socratic Clue' : 'Need a hint? (Socratic Prompt)'}
               </button>
               {showHint && (
-                <div className="mt-2 p-3 bg-amber-950/30 border border-amber-900/40 rounded-xl text-xs text-amber-200 leading-relaxed">
-                  💡 <strong>Tutor Clue:</strong> {currentQ.hint}
+                <div className="mt-2.5 p-3.5 bg-brass-subtle border border-brass-light/70 rounded-xl font-serif text-xs sm:text-sm text-primary leading-relaxed">
+                  💡 <strong>Socratic Clue:</strong> {currentQ.hint}
                 </div>
               )}
             </div>
           )}
 
-          {/* Revealed Rationale Box */}
+          {/* Revealed Rationale */}
           {showExplanation && (
             <div
-              className={`p-4 rounded-2xl border text-xs sm:text-sm mb-6 ${
+              className={`p-4 rounded-xl border font-serif text-sm ${
                 isCorrect
-                  ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-200'
-                  : 'bg-rose-950/30 border-rose-900/50 text-rose-200'
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
               }`}
             >
               <div className="font-bold flex items-center gap-1.5 mb-1.5">
                 {isCorrect ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    Correct! Great conceptual grasp.
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Correct! Solid conceptual understanding.
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-4 h-4 text-rose-400" />
-                    Misconception Detected
+                    <XCircle className="w-4 h-4 text-rose-600" />
+                    Misconception Identified
                   </>
                 )}
               </div>
-              <p className="text-slate-300 leading-relaxed">{currentQ.explanation}</p>
+              <p className="leading-relaxed text-primary/80">{currentQ.explanation}</p>
             </div>
           )}
 
           {/* Footer Controls */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-4 border-t border-border">
             <button
               onClick={() => {
                 if (confirm('Cancel this quiz session? Progress will not be saved.')) {
                   setQuestions(null);
                 }
               }}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+              className="font-mono text-xs text-muted hover:text-primary transition-colors cursor-pointer"
             >
-              Abandon Quiz
+              Cancel Session
             </button>
 
             {!showExplanation ? (
               <button
                 onClick={handleCheckAnswer}
                 disabled={!hasSelected}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-md shadow-indigo-600/30 transition-all"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-serif text-sm font-semibold bg-primary hover:bg-primary-hover disabled:opacity-40 text-white shadow-sm transition-all cursor-pointer"
               >
-                <span>Check Answer</span>
+                <span>Verify Answer</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={handleNextQuestion}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/30 transition-all"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-serif text-sm font-semibold bg-primary hover:bg-primary-hover text-white shadow-sm transition-all cursor-pointer"
               >
                 <span>
                   {currentIndex === questions.length - 1
                     ? isSubmitting
-                      ? 'Submitting & Evaluating...'
-                      : 'Finish & View Diagnostic Report'
+                      ? 'Evaluating Diagnostic Benchmark...'
+                      : 'Complete Assessment & View Report'
                     : 'Next Question'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
@@ -522,67 +499,73 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
     );
   }
 
-  // 3. Quiz Launcher Setup View
+  // 3. Quiz Launcher Setup View (Classical Unique Light Styling)
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-                <Zap className="w-5 h-5" />
-              </span>
-              <h2 className="text-xl sm:text-2xl font-bold text-white">Adaptive Diagnostic Quizzes</h2>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <div className="bg-surface-card border border-border rounded-2xl p-6 sm:p-10 shadow-sm relative overflow-hidden space-y-6">
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-brass-subtle border border-brass-light/70 flex items-center justify-center text-brass shadow-2xs shrink-0">
+              <Zap className="w-6 h-6 fill-brass/20" />
             </div>
-            <p className="text-slate-400 text-xs sm:text-sm mt-1">
-              Dynamic question generator powered by AI with real-time misconception evaluation
-            </p>
+            <div>
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-primary tracking-tight">
+                Adaptive Diagnostic Quizzes
+              </h2>
+              <p className="text-muted font-serif text-xs sm:text-sm mt-0.5">
+                Dynamic question synthesis calibrated to your knowledge model and fragile boundaries
+              </p>
+            </div>
           </div>
 
           {student?.weakAreas && student.weakAreas.length > 0 && (
-            <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-2 text-xs text-rose-300">
-              <Target className="w-4 h-4 text-rose-400" />
-              <span>
-                <strong>{student.weakAreas.length} Weak Area(s)</strong> flagged for adaptive testing
+            <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3.5 py-2 text-xs text-rose-800 shrink-0">
+              <Target className="w-4 h-4 text-rose-600 shrink-0" />
+              <span className="font-serif">
+                <strong className="font-bold">{student.weakAreas.length} Weak Area(s)</strong> flagged for adaptive testing
               </span>
             </div>
           )}
         </div>
 
         {/* Configuration Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-          {/* Subject */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Subject Area */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Select Subject Area
+            <label className="block font-mono text-[11px] font-bold uppercase tracking-wider text-muted mb-2">
+              SELECT SUBJECT AREA
             </label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none focus:border-indigo-500"
-            >
-              <option value="Computer Science">Computer Science & Algorithms</option>
-              <option value="Physics & Mechanics">Physics & Mechanics</option>
-              <option value="Mathematics & Calculus">Mathematics & Calculus</option>
-              <option value="Artificial Intelligence">Artificial Intelligence & ML</option>
-              <option value="Chemistry">General Chemistry</option>
-            </select>
+            <div className="relative">
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full bg-surface-low border border-border rounded-xl px-4 py-3 text-sm text-primary font-serif font-medium focus:outline-hidden focus:border-brass transition-colors cursor-pointer"
+              >
+                <option value="Computer Science">Computer Science & Algorithms</option>
+                <option value="Physics & Mechanics">Physics & Mechanics</option>
+                <option value="Mathematics & Calculus">Mathematics & Calculus</option>
+                <option value="Artificial Intelligence">Artificial Intelligence & ML</option>
+                <option value="Chemistry">General Chemistry</option>
+              </select>
+            </div>
           </div>
 
-          {/* Difficulty */}
+          {/* Difficulty Calibration */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-              Difficulty Calibration
+            <label className="block font-mono text-[11px] font-bold uppercase tracking-wider text-muted mb-2">
+              DIFFICULTY CALIBRATION
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
               {(['beginner', 'intermediate', 'advanced'] as const).map((diff) => (
                 <button
                   key={diff}
+                  type="button"
                   onClick={() => setDifficulty(diff)}
-                  className={`py-2 px-3 rounded-xl text-xs font-medium capitalize border transition-all ${
+                  className={`py-3 px-3 rounded-xl font-serif text-sm font-semibold capitalize border transition-all cursor-pointer ${
                     difficulty === diff
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      ? 'bg-primary text-white border-brass shadow-xs'
+                      : 'bg-surface-low text-primary border-border hover:bg-surface'
                   }`}
                 >
                   {diff}
@@ -592,53 +575,53 @@ export const QuizSession: React.FC<QuizSessionProps> = ({
           </div>
         </div>
 
-        {/* Custom Topic Input */}
-        <div className="mb-6">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-            Target Topic or Subtopic (Optional)
+        {/* Target Topic Input */}
+        <div>
+          <label className="block font-mono text-[11px] font-bold uppercase tracking-wider text-muted mb-2">
+            TARGET TOPIC OR SUBTOPIC (OPTIONAL)
           </label>
           <input
             type="text"
             value={selectedTopic}
             onChange={(e) => setSelectedTopic(e.target.value)}
             placeholder="e.g., Recursion Base Cases, Rotational Inertia, Integration by Parts..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500"
+            className="w-full bg-surface-low border border-border rounded-xl px-4 py-3 text-sm font-serif text-primary placeholder-muted/60 focus:outline-hidden focus:border-brass transition-colors"
           />
         </div>
 
-        {/* Focus on Weak Areas Checkbox */}
-        <div className="mb-8 bg-slate-800/60 border border-slate-700/80 rounded-2xl p-4 flex items-start gap-3">
+        {/* Prioritize Weak Areas Checkbox */}
+        <div className="bg-surface-low border border-border rounded-xl p-4 sm:p-5 flex items-start gap-3.5">
           <input
             type="checkbox"
             id="focusWeak"
             checked={focusOnWeakAreas}
             onChange={(e) => setFocusOnWeakAreas(e.target.checked)}
-            className="mt-1 w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+            className="mt-1 w-4 h-4 accent-[#A17F3B] rounded cursor-pointer"
           />
-          <label htmlFor="focusWeak" className="cursor-pointer text-xs sm:text-sm">
-            <span className="font-semibold text-white block">
+          <label htmlFor="focusWeak" className="cursor-pointer text-xs sm:text-sm font-serif">
+            <span className="font-bold text-primary block text-sm">
               Prioritize Questions on Diagnosed Weak Areas (Adaptive)
             </span>
-            <span className="text-slate-400 block mt-0.5 text-xs">
-              When checked, the AI will synthesize questions specifically testing the knowledge gaps flagged during previous quizzes.
+            <span className="text-muted block mt-0.5 leading-relaxed text-xs">
+              When enabled, the Bayesian engine focuses questions precisely on identified misconceptions flagged during prior diagnostics.
             </span>
           </label>
         </div>
 
-        {/* Start Button */}
+        {/* Generate & Launch CTA Button */}
         <button
           onClick={startQuiz}
           disabled={isGenerating}
-          className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-sm font-semibold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white shadow-xl shadow-indigo-600/25 transition-all disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-xl font-serif text-base font-semibold uppercase tracking-wider bg-primary hover:bg-primary-hover active:scale-[0.99] text-white shadow-xs border border-brass/50 transition-all disabled:opacity-50 cursor-pointer"
         >
           {isGenerating ? (
             <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Synthesizing Adaptive Quiz with Gemini NLP...</span>
+              <div className="w-4 h-4 border-2 border-brass-light border-t-transparent rounded-full animate-spin" />
+              <span>Calibrating Adaptive Diagnostic with Gemini NLP...</span>
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 text-brass-light" />
               <span>Generate & Launch Adaptive Quiz</span>
             </>
           )}

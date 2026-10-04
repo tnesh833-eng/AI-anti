@@ -19,6 +19,20 @@ export interface QuizRecord {
   missedSubtopics: string[];
 }
 
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  category: 'streak' | 'consistency' | 'accuracy' | 'mastery';
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  icon: 'flame' | 'award' | 'target' | 'zap' | 'shield' | 'brain' | 'clock' | 'star';
+  unlocked: boolean;
+  unlockedAt?: string;
+  progress: number;
+  maxProgress: number;
+  xpBonus: number;
+}
+
 export interface StudentProfile {
   id: string;
   name: string;
@@ -30,6 +44,9 @@ export interface StudentProfile {
   masteryLevels: Record<string, number>;
   weakAreas: WeakArea[];
   quizHistory: QuizRecord[];
+  achievements?: Achievement[];
+  isAuthenticated?: boolean;
+  authMethod?: 'email_otp' | 'password' | 'guest';
 }
 
 export type TutorMode = 'socratic' | 'deep_dive' | 'eli5' | 'practice' | 'code_debug';

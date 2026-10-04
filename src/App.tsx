@@ -11,13 +11,16 @@ import { PerformanceDashboard } from './components/PerformanceDashboard.tsx';
 import { RecommendationsHub } from './components/RecommendationsHub.tsx';
 import { CurriculumExplorer } from './components/CurriculumExplorer.tsx';
 import { LandingPage } from './components/LandingPage.tsx';
+import { AIAssistantWidget } from './components/AIAssistantWidget.tsx';
 import { StudentProfile } from './types.ts';
+import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 
-export default function App() {
+function AppInner() {
   const [activeTab, setActiveTab] = useState<string>('home');
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [allStudentIds, setAllStudentIds] = useState<string[]>(['student-1', 'student-2']);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { user } = useAuth();
 
   // Cross-component navigation state
   const [quizPrefill, setQuizPrefill] = useState<{ subject: string; topic?: string }>({
@@ -29,7 +32,17 @@ export default function App() {
       const res = await fetch('/api/student/profile');
       const data = await res.json();
       if (data.success && data.student) {
-        setStudent(data.student);
+        let baseStudent = data.student;
+        // If authenticated with Firebase, personalize with user identity
+        if (user) {
+          baseStudent = {
+            ...baseStudent,
+            id: user.uid,
+            name: user.displayName || baseStudent.name,
+            email: user.email || baseStudent.email,
+          };
+        }
+        setStudent(baseStudent);
         if (data.allStudentIds) {
           setAllStudentIds(data.allStudentIds);
         }
@@ -43,7 +56,7 @@ export default function App() {
 
   useEffect(() => {
     fetchStudentProfile();
-  }, []);
+  }, [user]);
 
   const handleSwitchStudent = async (studentId: string) => {
     try {
@@ -79,18 +92,17 @@ export default function App() {
     setActiveTab('quiz');
   };
 
-  const handleAskTutorAboutMistake = (questionText: string, explanation: string) => {
-    // Switch to tutor chat tab
+  const handleAskTutorAboutMistake = (_questionText: string, _explanation: string) => {
     setActiveTab('tutor');
   };
 
-  const handleAskTutorTopic = (subject: string, question: string) => {
+  const handleAskTutorTopic = (_subject: string, _question: string) => {
     setActiveTab('tutor');
   };
 
   return (
     <div className="min-h-screen bg-surface text-primary flex flex-col font-sans selection:bg-brass-light selection:text-primary">
-      {/* Top Navigation */}
+      {/* Top Navigation with Firebase Authentication */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -103,9 +115,9 @@ export default function App() {
       <main className="flex-1 w-full flex flex-col items-center">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
-            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-slate-400 font-medium">
-              Initializing Intelligent Tutor & Loading Student Knowledge Profile...
+            <div className="w-10 h-10 border-4 border-brass border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-muted font-serif font-medium">
+              Initializing Intelligent Tutor & Synchronizing Student Knowledge Profile...
             </p>
           </div>
         ) : (
@@ -138,7 +150,7 @@ export default function App() {
                 onLaunchRemedialQuiz={(subtopic) =>
                   handleNavigateToQuiz(student?.preferredSubject || 'Computer Science', subtopic)
                 }
-                onAskTutorAboutWeakArea={(subtopic) => {
+                onAskTutorAboutWeakArea={(_subtopic) => {
                   setActiveTab('tutor');
                 }}
                 onResetStudentData={handleResetStudentData}
@@ -151,7 +163,7 @@ export default function App() {
                 onLaunchRemedialQuiz={(topic) =>
                   handleNavigateToQuiz(student?.preferredSubject || 'Computer Science', topic)
                 }
-                onAskTutor={(topic) => {
+                onAskTutor={(_topic) => {
                   setActiveTab('tutor');
                 }}
               />
@@ -167,17 +179,37 @@ export default function App() {
         )}
       </main>
 
+      {/* Omnipresent Floating AI Study Assistant */}
+      {activeTab !== 'tutor' && (
+        <AIAssistantWidget
+          student={student}
+          activeTab={activeTab}
+          onOpenFullTutor={() => setActiveTab('tutor')}
+          onNavigateToQuiz={handleNavigateToQuiz}
+        />
+      )}
+
       {/* PERSISTENT FOOTER */}
       <footer className="w-full bg-surface border-t border-border py-8 mt-auto">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-serif text-muted">
           <div className="flex items-center gap-2">
             <span className="font-bold text-primary">Academia Intelligentia</span>
             <span>|</span>
-            <span className="font-mono text-[11px] uppercase tracking-wider text-brass">Intelligent Tutor AI Learning System</span>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-brass">
+              Intelligent Tutor AI Learning System
+            </span>
           </div>
-          <div>&copy; 2024 Intelligent Tutor System. Built strictly to project specification.</div>
+          <div>&copy; 2024 Intelligent Tutor System. Firebase Auth & Firestore Enabled.</div>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }

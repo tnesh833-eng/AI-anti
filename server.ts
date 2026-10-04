@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +95,20 @@ interface QuizRecord {
   missedSubtopics: string[];
 }
 
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  category: 'streak' | 'consistency' | 'accuracy' | 'mastery';
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  icon: 'flame' | 'award' | 'target' | 'zap' | 'shield' | 'brain' | 'clock' | 'star';
+  unlocked: boolean;
+  unlockedAt?: string;
+  progress: number;
+  maxProgress: number;
+  xpBonus: number;
+}
+
 interface StudentProfile {
   id: string;
   name: string;
@@ -112,6 +127,126 @@ interface StudentProfile {
     recommendationSnippet: string;
   }[];
   quizHistory: QuizRecord[];
+  achievements?: Achievement[];
+}
+
+function computeStudentAchievements(student: StudentProfile): Achievement[] {
+  const totalQuizzes = student.quizHistory.length;
+  const streak = student.streakDays;
+  const hasHighAccuracy = student.quizHistory.some((q) => q.percentage >= 80);
+  const avgAccuracy =
+    totalQuizzes > 0
+      ? Math.round(student.quizHistory.reduce((acc, q) => acc + q.percentage, 0) / totalQuizzes)
+      : 0;
+  const resolvedWeakArea = student.weakAreas.some((w) => w.errorCount <= 1);
+  const xp = student.xpPoints;
+
+  return [
+    {
+      id: 'streak-bronze',
+      title: 'Study Habit Ignition',
+      description: 'Maintain an unbroken daily learning streak of at least 3 days.',
+      category: 'streak',
+      tier: 'bronze',
+      icon: 'flame',
+      unlocked: streak >= 3,
+      unlockedAt: streak >= 3 ? 'Day 3' : undefined,
+      progress: Math.min(3, streak),
+      maxProgress: 3,
+      xpBonus: 100,
+    },
+    {
+      id: 'streak-silver',
+      title: 'Relentless Momentum',
+      description: 'Reach a 7-day consistent study streak with adaptive daily drills.',
+      category: 'streak',
+      tier: 'silver',
+      icon: 'flame',
+      unlocked: streak >= 7,
+      unlockedAt: streak >= 7 ? 'Day 7' : undefined,
+      progress: Math.min(7, streak),
+      maxProgress: 7,
+      xpBonus: 250,
+    },
+    {
+      id: 'streak-gold',
+      title: 'Immortal Scholar Streak',
+      description: 'Reach a 14-day study streak demonstrating elite academic discipline.',
+      category: 'streak',
+      tier: 'gold',
+      icon: 'zap',
+      unlocked: streak >= 14,
+      unlockedAt: streak >= 14 ? 'Day 14' : undefined,
+      progress: Math.min(14, streak),
+      maxProgress: 14,
+      xpBonus: 500,
+    },
+    {
+      id: 'accuracy-sharpshooter',
+      title: 'Precision Sharpshooter',
+      description: 'Score 80% or higher on an adaptive diagnostic quiz session.',
+      category: 'accuracy',
+      tier: 'silver',
+      icon: 'target',
+      unlocked: hasHighAccuracy,
+      unlockedAt: hasHighAccuracy ? 'Recent Quiz' : undefined,
+      progress: hasHighAccuracy ? 1 : avgAccuracy >= 60 ? 1 : 0,
+      maxProgress: 1,
+      xpBonus: 150,
+    },
+    {
+      id: 'consistency-quizzes',
+      title: 'Assessment Veteran',
+      description: 'Complete at least 5 adaptive quiz diagnostic evaluations.',
+      category: 'consistency',
+      tier: 'silver',
+      icon: 'award',
+      unlocked: totalQuizzes >= 5,
+      unlockedAt: totalQuizzes >= 5 ? 'Milestone' : undefined,
+      progress: Math.min(5, totalQuizzes),
+      maxProgress: 5,
+      xpBonus: 200,
+    },
+    {
+      id: 'xp-milestone',
+      title: 'Centurion Scholar',
+      description: 'Accumulate over 1,000 Total XP across quizzes and Socratic inquiries.',
+      category: 'mastery',
+      tier: 'gold',
+      icon: 'star',
+      unlocked: xp >= 1000,
+      unlockedAt: xp >= 1000 ? 'Milestone' : undefined,
+      progress: Math.min(1000, xp),
+      maxProgress: 1000,
+      xpBonus: 300,
+    },
+    {
+      id: 'weakness-slayer',
+      title: 'Gap Eliminator',
+      description: 'Retake remedial quizzes to bring diagnosed misconceptions under control.',
+      category: 'mastery',
+      tier: 'silver',
+      icon: 'shield',
+      unlocked: resolvedWeakArea,
+      unlockedAt: resolvedWeakArea ? 'Remedial Drill' : undefined,
+      progress: resolvedWeakArea ? 1 : 0,
+      maxProgress: 1,
+      xpBonus: 200,
+    },
+    {
+      id: 'socratic-seeker',
+      title: 'Socratic Dialogue Initiate',
+      description: 'Engage the AI Tutor in multi-turn Socratic step-by-step reasoning.',
+      category: 'consistency',
+      tier: 'bronze',
+      icon: 'brain',
+      unlocked: true,
+      unlockedAt: 'Orientation',
+      progress: 1,
+      maxProgress: 1,
+      xpBonus: 100,
+    },
+  ];
 }
 
 const mockStudents: Record<string, StudentProfile> = {
@@ -229,6 +364,7 @@ let currentStudentId = 'student-1';
 // 1. Student Profile
 app.get('/api/student/profile', (_req: Request, res: Response) => {
   const profile = mockStudents[currentStudentId] || mockStudents['student-1'];
+  profile.achievements = computeStudentAchievements(profile);
   res.json({ success: true, student: profile, allStudentIds: Object.keys(mockStudents) });
 });
 
@@ -236,7 +372,9 @@ app.post('/api/student/switch', (req: Request, res: Response) => {
   const { studentId } = req.body;
   if (mockStudents[studentId]) {
     currentStudentId = studentId;
-    return res.json({ success: true, student: mockStudents[currentStudentId] });
+    const profile = mockStudents[currentStudentId];
+    profile.achievements = computeStudentAchievements(profile);
+    return res.json({ success: true, student: profile });
   }
   res.status(404).json({ success: false, message: 'Student not found' });
 });
@@ -250,6 +388,7 @@ app.post('/api/student/reset', (_req: Request, res: Response) => {
     Object.keys(student.masteryLevels).forEach((k) => {
       student.masteryLevels[k] = 50;
     });
+    student.achievements = computeStudentAchievements(student);
   }
   res.json({ success: true, student });
 });
@@ -791,6 +930,8 @@ Provide:
       aiFeedback = `Don't be discouraged! Quizzes exist to pinpoint exactly where learning happens. We've flagged ${missedSubtopics.join(', ')} in your personalized study plan so you can review bite-sized lessons.`;
     }
   }
+
+  student.achievements = computeStudentAchievements(student);
 
   res.json({
     success: true,
